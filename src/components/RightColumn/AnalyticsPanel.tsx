@@ -268,8 +268,10 @@ export const AnalyticsPanel: React.FC = () => {
             <span className="rounded bg-emerald-100 px-1.5 py-0.2 text-[9px] font-bold text-emerald-800 border border-emerald-300">
               Cloud Sync
             </span>
-            <span className="font-mono text-[10px] text-slate-600 font-semibold">
-              {escogencias.length}
+            <span className="font-mono text-[10px] text-slate-600 font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200 shadow-2xs">
+              {liveSearchTerm.trim()
+                ? `${filteredEscogencias.length} / ${escogencias.length}`
+                : escogencias.length}
             </span>
           </div>
         </div>
@@ -287,12 +289,28 @@ export const AnalyticsPanel: React.FC = () => {
           {liveSearchTerm && (
             <button
               onClick={() => setLiveSearchTerm('')}
-              className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+              className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
             >
               <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
+
+        {/* Total search results count banner */}
+        {liveSearchTerm.trim() && (
+          <div className="flex items-center justify-between px-2.5 py-1 text-[11px] font-medium text-blue-800 bg-blue-50/90 border border-blue-200 rounded-lg shrink-0 shadow-2xs">
+            <span>
+              Resultados encontrados: <strong className="font-bold text-blue-900">{filteredEscogencias.length}</strong> de {escogencias.length} {escogencias.length === 1 ? 'registro' : 'registros'}
+            </span>
+            <button
+              type="button"
+              onClick={() => setLiveSearchTerm('')}
+              className="text-blue-600 hover:text-blue-800 font-semibold underline text-[10px] cursor-pointer"
+            >
+              Limpiar
+            </button>
+          </div>
+        )}
 
         {/* Live typing alert if someone in another tab or device is currently typing */}
         {liveTypingUsers.length > 0 && !isHearingFinished && (

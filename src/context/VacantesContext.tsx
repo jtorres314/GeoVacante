@@ -83,36 +83,96 @@ interface VacantesContextType {
 
 const VacantesContext = createContext<VacantesContextType | undefined>(undefined);
 
+const normalizeText = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const isEscogenciaForSeccional = (
+  e: EscogenciaRegistro,
+  dept: DepartmentData,
+  sec: DepartmentData['seccionales'][0]
+): boolean => {
+  if (e.seccionalId && e.seccionalId === sec.id) return true;
+
+  const normDeptName = normalizeText(dept.nombre);
+  const normEscDeptName = normalizeText(e.departamentoNombre || '');
+
+  const deptMatches =
+    e.departamentoId === dept.id ||
+    (normEscDeptName && normEscDeptName === normDeptName) ||
+    (normEscDeptName && normDeptName.includes(normEscDeptName)) ||
+    (normEscDeptName && normEscDeptName.includes(normDeptName));
+
+  if (!deptMatches) return false;
+
+  const normE = normalizeText(e.seccionalNombre || '');
+  const normS = normalizeText(sec.nombre || '');
+
+  // If department has only 1 seccional
+  if (dept.seccionales.length === 1) {
+    const isSecNC = normS.includes('nivel central');
+    const isEscNC = normE.includes('nivel central');
+    if (isSecNC === isEscNC) return true;
+  }
+
+  if (!normE || !normS) return false;
+  if (normE === normS) return true;
+
+  const isSecNC = normS.includes('nivel central');
+  const isEscNC = normE.includes('nivel central');
+  if (isSecNC !== isEscNC) return false;
+
+  const cleanE = normE
+    .replace(/^nivel central\s*/, '')
+    .replace(/^direccion seccional\s*/, '')
+    .replace(/^direccion especializada\s*/, '')
+    .trim();
+  const cleanS = normS
+    .replace(/^nivel central\s*/, '')
+    .replace(/^direccion seccional\s*/, '')
+    .replace(/^direccion especializada\s*/, '')
+    .trim();
+
+  if (cleanE === cleanS) return true;
+
+  const keywords = [
+    'extincion',
+    'lavado',
+    'organizaciones criminales',
+    'derechos humanos',
+    'narcotrafico',
+    'corrupcion',
+    'justicia transicional',
+    'corte suprema',
+    'unidad especial',
+    'seguridad territorial',
+    'recursos naturales',
+  ];
+
+  for (const kw of keywords) {
+    if (cleanE.includes(kw) && cleanS.includes(kw)) {
+      return true;
+    }
+  }
+
+  if (cleanE.length > 3 && cleanS.length > 3) {
+    if (cleanE.includes(cleanS) || cleanS.includes(cleanE)) return true;
+  }
+
+  return false;
+};
+
 const computeSyncedDepartments = (depts: DepartmentData[], currentEscogencias: EscogenciaRegistro[]) => {
   return depts.map((dept) => {
     return {
       ...dept,
       seccionales: dept.seccionales.map((sec) => {
-        const countOcupados = currentEscogencias.filter((e) => {
-          if (e.seccionalId === sec.id) return true;
-
-          const deptMatches =
-            e.departamentoId === dept.id ||
-            (e.departamentoNombre &&
-              e.departamentoNombre.trim().toLowerCase() === dept.nombre.trim().toLowerCase());
-
-          if (!deptMatches) return false;
-          if (!e.seccionalNombre || !sec.nombre) return false;
-
-          const eName = e.seccionalNombre.trim().toLowerCase();
-          const sName = sec.nombre.trim().toLowerCase();
-
-          if (eName === sName) return true;
-
-          const isSecNivelCentral = sName.includes('nivel central');
-          const isEscNivelCentral = eName.includes('nivel central');
-          if (isSecNivelCentral !== isEscNivelCentral) return false;
-
-          const cleanE = eName.replace(/^nivel central\s*[-–—]\s*[^\s—–-]+\s*[—–-]\s*/i, '').trim();
-          const cleanS = sName.replace(/^nivel central\s*[-–—]\s*[^\s—–-]+\s*[—–-]\s*/i, '').trim();
-
-          return cleanE === cleanS || cleanE.includes(cleanS) || cleanS.includes(cleanE);
-        }).length;
+        const countOcupados = currentEscogencias.filter((e) => isEscogenciaForSeccional(e, dept, sec)).length;
 
         const ofertados = sec.cuposOfertados;
         const ocu = Math.min(ofertados, countOcupados);
