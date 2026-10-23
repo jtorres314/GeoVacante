@@ -54,7 +54,7 @@ interface VacantesContextType {
   updateSeccionalCupo: (deptId: string, seccionalId: string, newDisponibles: number) => void;
   toggleSeccionalDisponibilidad: (deptId: string, seccionalId: string) => void;
   toggleSeccionalAutomatico: (deptId: string, seccionalId: string) => void;
-  registrarEscogencia: (aspirante: string, deptId: string, seccionalId: string, observaciones?: string) => boolean;
+  registrarEscogencia: (aspirante: string, deptId: string, seccionalId: string) => boolean;
   liberarEscogencia: (id: string) => void;
   restablecerDatosFabrica: () => void;
   simularAsignacionAleatoria: () => void;
@@ -544,7 +544,7 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Register an escogencia in Firestore
   const registrarEscogencia = useCallback(
-    (aspirante: string, deptId: string, seccionalId: string, observaciones?: string): boolean => {
+    (aspirante: string, deptId: string, seccionalId: string): boolean => {
       if (isHearingFinished) {
         addToast(
           'La audiencia oficial ha finalizado a las 17:00 del 23 de octubre. Sistema en modo solo lectura para comprobación.',
@@ -585,7 +585,6 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         departamentoNombre: dept.nombre,
         seccionalId: sec.id,
         seccionalNombre: sec.nombre,
-        observaciones: observaciones?.trim() || undefined,
         fecha: fechaBogota,
         isNew: true,
       };

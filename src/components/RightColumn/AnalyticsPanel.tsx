@@ -303,11 +303,6 @@ export const AnalyticsPanel: React.FC = () => {
                   <div className="text-[11px] text-emerald-800 font-semibold truncate">
                     {esc.departamentoNombre} — {esc.seccionalNombre}
                   </div>
-                  {esc.observaciones && (
-                    <div className="text-[10px] text-slate-500 truncate">
-                      «{esc.observaciones}»
-                    </div>
-                  )}
                   <div className="text-[9px] font-mono text-slate-400 flex items-center gap-1">
                     <Calendar className="h-2.5 w-2.5" />
                     <span>{esc.fecha} (Hora Bogotá)</span>

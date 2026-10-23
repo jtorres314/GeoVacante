@@ -22,7 +22,6 @@ export interface EscogenciaRegistro {
   departamentoNombre: string;
   seccionalId: string;
   seccionalNombre: string;
-  observaciones?: string;
   fecha: string;
   isNew?: boolean;
 }

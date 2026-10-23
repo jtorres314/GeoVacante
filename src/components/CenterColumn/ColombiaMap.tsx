@@ -182,21 +182,21 @@ export const ColombiaMap: React.FC = () => {
       className="relative flex flex-col h-full w-full rounded-xl border border-slate-200 bg-white shadow-xs overflow-hidden select-none"
     >
       {/* Top Header info bar */}
-      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-200 bg-white z-10">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 py-2 border-b border-slate-200 bg-white z-10">
         <div className="flex items-center gap-2">
-          <Flame className="h-4 w-4 text-orange-500 animate-pulse" />
+          <Flame className="h-4 w-4 text-orange-500 animate-pulse shrink-0" />
           <h2 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
-            MAPA DE VACANTES (MAPA DE CALOR)
+            MAPA DE VACANTES
           </h2>
-          <span className="hidden sm:inline-block rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700 border border-orange-200">
-            Verde (Disponibles) ➔ Rojo (Sin Vacantes)
+          <span className="hidden md:inline-block rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700 border border-orange-200">
+            Verde (Disp.) ➔ Rojo (Agotado)
           </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
           {/* Quick corner position selector */}
-          <div className="hidden lg:flex items-center gap-1 text-[11px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
-            <span className="text-[10px] font-semibold text-slate-400">Pop-up HUD:</span>
+          <div className="flex items-center gap-1 text-[11px] text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200">
+            <span className="text-[10px] font-semibold text-slate-400">HUD:</span>
             <button
               onClick={() => setCornerPreference('auto')}
               className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-colors ${
@@ -204,9 +204,9 @@ export const ColombiaMap: React.FC = () => {
                   ? 'bg-emerald-600 text-white'
                   : 'text-slate-600 hover:text-slate-900'
               }`}
-              title="Alternar automáticamente arriba izquierda o arriba derecha según ubicación geográfica"
+              title="Alternar automáticamente según ubicación geográfica"
             >
-              Auto (Según Ubicación)
+              Auto
             </button>
             <button
               onClick={() => setCornerPreference('top-left')}
@@ -217,7 +217,7 @@ export const ColombiaMap: React.FC = () => {
               }`}
               title="Fijar en Arriba Izquierda"
             >
-              Arriba Izq.
+              Izq.
             </button>
             <button
               onClick={() => setCornerPreference('top-right')}
@@ -228,25 +228,25 @@ export const ColombiaMap: React.FC = () => {
               }`}
               title="Fijar en Arriba Derecha"
             >
-              Arriba Der.
+              Der.
             </button>
           </div>
 
           {selectedDeptStats ? (
             <div className="flex items-center gap-1.5 text-xs text-slate-700">
-              <span className="font-bold text-slate-900">
-                Fijado: {selectedDeptStats.nombre}
+              <span className="font-bold text-slate-900 truncate max-w-[120px]">
+                {selectedDeptStats.nombre}
               </span>
               <button
                 onClick={() => setSelectedDeptId(null)}
                 className="text-[10px] text-slate-500 hover:text-red-600 underline"
               >
-                (deseleccionar)
+                (limpiar)
               </button>
             </div>
           ) : (
-            <span className="hidden sm:inline text-xs text-slate-400">
-              Pasa el cursor o haz clic para ver disponibilidad
+            <span className="hidden xl:inline text-xs text-slate-400">
+              Pasa el cursor o haz clic
             </span>
           )}
         </div>

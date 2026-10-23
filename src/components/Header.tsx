@@ -147,7 +147,7 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
         <HearingChronometer isHearingDay={isHearingDay} />
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2">
+        <div className="w-full 2xl:w-auto flex flex-wrap items-center justify-center 2xl:justify-end gap-2 pt-1.5 border-t border-slate-100 2xl:border-t-0 2xl:pt-0">
 
           {/* Undo Action */}
           {canUndo && !isHearingDay && !isHearingFinished && (
