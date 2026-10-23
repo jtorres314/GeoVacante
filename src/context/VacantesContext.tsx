@@ -83,20 +83,54 @@ interface VacantesContextType {
 
 const VacantesContext = createContext<VacantesContextType | undefined>(undefined);
 
-export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [departments, setDepartments] = useState<DepartmentData[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_DEPTS);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch {
-      // ignore
-    }
-    return INITIAL_DEPARTMENTS;
-  });
+const computeSyncedDepartments = (depts: DepartmentData[], currentEscogencias: EscogenciaRegistro[]) => {
+  return depts.map((dept) => {
+    return {
+      ...dept,
+      seccionales: dept.seccionales.map((sec) => {
+        const countOcupados = currentEscogencias.filter((e) => {
+          if (e.seccionalId === sec.id) return true;
 
+          const deptMatches =
+            e.departamentoId === dept.id ||
+            (e.departamentoNombre &&
+              e.departamentoNombre.trim().toLowerCase() === dept.nombre.trim().toLowerCase());
+
+          if (!deptMatches) return false;
+          if (!e.seccionalNombre || !sec.nombre) return false;
+
+          const eName = e.seccionalNombre.trim().toLowerCase();
+          const sName = sec.nombre.trim().toLowerCase();
+
+          if (eName === sName) return true;
+
+          const isSecNivelCentral = sName.includes('nivel central');
+          const isEscNivelCentral = eName.includes('nivel central');
+          if (isSecNivelCentral !== isEscNivelCentral) return false;
+
+          const cleanE = eName.replace(/^nivel central\s*[-–—]\s*[^\s—–-]+\s*[—–-]\s*/i, '').trim();
+          const cleanS = sName.replace(/^nivel central\s*[-–—]\s*[^\s—–-]+\s*[—–-]\s*/i, '').trim();
+
+          return cleanE === cleanS || cleanE.includes(cleanS) || cleanS.includes(cleanE);
+        }).length;
+
+        const ofertados = sec.cuposOfertados;
+        const ocu = Math.min(ofertados, countOcupados);
+        const disp = Math.max(0, ofertados - ocu);
+        const isAvail = sec.automatico ? disp > 0 : sec.disponible;
+        return {
+          ...sec,
+          cuposOfertados: ofertados,
+          cuposDisponibles: disp,
+          cuposOcupados: ocu,
+          disponible: isAvail,
+        };
+      }),
+    };
+  });
+};
+
+export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [escogencias, setEscogencias] = useState<EscogenciaRegistro[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY_ESCOGENCIAS);
@@ -108,6 +142,20 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       // ignore
     }
     return [];
+  });
+
+  const [departments, setDepartments] = useState<DepartmentData[]>(() => {
+    let baseDepts = INITIAL_DEPARTMENTS;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_DEPTS);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) baseDepts = parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return computeSyncedDepartments(baseDepts, escogencias);
   });
 
   // By default, NO department is pinned on initial load.
@@ -291,26 +339,7 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         cloudEscogencias.sort((a, b) => b.fecha.localeCompare(a.fecha));
         setEscogencias(cloudEscogencias);
-
-        const syncedDepartments = INITIAL_DEPARTMENTS.map((dept) => {
-          return {
-            ...dept,
-            seccionales: dept.seccionales.map((sec) => {
-              const countOcupados = cloudEscogencias.filter((e) => e.seccionalId === sec.id).length;
-              const ofertados = sec.cuposOfertados;
-              const ocu = Math.min(ofertados, countOcupados);
-              const disp = Math.max(0, ofertados - ocu);
-              return {
-                ...sec,
-                cuposOfertados: ofertados,
-                cuposDisponibles: disp,
-                cuposOcupados: ocu,
-                disponible: sec.automatico ? disp > 0 : sec.disponible,
-              };
-            }),
-          };
-        });
-        setDepartments(syncedDepartments);
+        setDepartments(computeSyncedDepartments(INITIAL_DEPARTMENTS, cloudEscogencias));
 
         setCloudSyncStatus('connected');
         setLastCloudSyncTime(getBogotaTimeString(new Date()));
