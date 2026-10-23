@@ -12,6 +12,9 @@ import {
   ArrowRightLeft,
   CheckCircle2,
   X,
+  Users,
+  Calendar,
+  Search,
 } from 'lucide-react';
 
 type CornerMode = 'auto' | 'top-left' | 'top-right';
@@ -24,6 +27,7 @@ export const ColombiaMap: React.FC = () => {
     hoveredDeptId,
     setHoveredDeptId,
     expandOnlyDept,
+    escogencias,
   } = useVacantes();
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -34,6 +38,9 @@ export const ColombiaMap: React.FC = () => {
   const [startPan, setStartPan] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [showLabels, setShowLabels] = useState<boolean>(true);
   const [cornerPreference, setCornerPreference] = useState<CornerMode>('auto');
+  const [hudTab, setHudTab] = useState<'seccionales' | 'postulados'>('seccionales');
+  const [isPostuladosModalOpen, setIsPostuladosModalOpen] = useState<boolean>(false);
+  const [modalSearchTerm, setModalSearchTerm] = useState<string>('');
 
   // Compute stats and heatmap for all departments
   const deptStatsMap = useMemo(() => {
@@ -90,6 +97,21 @@ export const ColombiaMap: React.FC = () => {
   const activeDeptId = hoveredDeptId || selectedDeptId;
   const activeDeptStats = activeDeptId ? deptStatsMap.get(activeDeptId) : null;
   const activeGeo = activeDeptId ? COLOMBIA_GEO.find((g) => g.id === activeDeptId) : null;
+
+  const activeDeptEscogencias = useMemo(() => {
+    if (!activeDeptId) return [];
+    return escogencias.filter((e) => e.departamentoId === activeDeptId);
+  }, [escogencias, activeDeptId]);
+
+  const filteredModalPostulados = useMemo(() => {
+    if (!modalSearchTerm.trim()) return activeDeptEscogencias;
+    const term = modalSearchTerm.toLowerCase().trim();
+    return activeDeptEscogencias.filter(
+      (e) =>
+        e.aspirante.toLowerCase().includes(term) ||
+        e.seccionalNombre.toLowerCase().includes(term)
+    );
+  }, [activeDeptEscogencias, modalSearchTerm]);
 
   // Determine corner location according to geography in Colombia (Left vs Right)
   // cx >= 295 = East/Right side -> HUD placed at Top-Left (Arriba Izquierda)
@@ -233,13 +255,27 @@ export const ColombiaMap: React.FC = () => {
           </div>
 
           {selectedDeptStats ? (
-            <div className="flex items-center gap-1.5 text-xs text-slate-700">
+            <div className="flex items-center gap-2 text-xs text-slate-700">
               <span className="font-bold text-slate-900 truncate max-w-[120px]">
                 {selectedDeptStats.nombre}
               </span>
               <button
+                onClick={() => {
+                  setHudTab('postulados');
+                  setIsPostuladosModalOpen(true);
+                }}
+                className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold hover:bg-blue-100 transition-colors cursor-pointer shadow-2xs"
+                title="Ver nombres de las personas postuladas en este departamento"
+              >
+                <Users className="h-3 w-3 text-blue-600" />
+                <span>
+                  {activeDeptEscogencias.length}{' '}
+                  {activeDeptEscogencias.length === 1 ? 'Postulado' : 'Postulados'}
+                </span>
+              </button>
+              <button
                 onClick={() => setSelectedDeptId(null)}
-                className="text-[10px] text-slate-500 hover:text-red-600 underline"
+                className="text-[10px] text-slate-500 hover:text-red-600 underline cursor-pointer"
               >
                 (limpiar)
               </button>
@@ -407,7 +443,7 @@ export const ColombiaMap: React.FC = () => {
         {/* DOCKED POP-UP HUD IN CORNER (ARRIBA IZQUIERDA O ARRIBA DERECHA SEGÚN UBICACIÓN EN EL MAPA) */}
         {activeDeptStats && (
           <div
-            className={`pointer-events-auto absolute z-30 transition-all duration-200 max-w-[280px] w-full sm:w-[280px] rounded-xl border border-slate-700/80 bg-slate-900/95 p-3.5 shadow-2xl backdrop-blur-md text-white ${
+            className={`pointer-events-auto absolute z-30 transition-all duration-200 max-w-[320px] w-full sm:w-[320px] rounded-xl border border-slate-700/80 bg-slate-900/95 p-3.5 shadow-2xl backdrop-blur-md text-white ${
               computedCorner === 'top-left' ? 'top-3 left-3' : 'top-3 right-3'
             }`}
           >
@@ -502,57 +538,144 @@ export const ColombiaMap: React.FC = () => {
               </div>
             </div>
 
-            {/* Breakdown of Seccionales */}
-            <div className="mt-2 pt-2 border-t border-slate-800 space-y-1 max-h-28 overflow-y-auto pr-1">
-              <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
-                Desglose por Seccional:
-              </span>
-              {activeDeptStats.seccionales.map((sec) => (
-                <div
-                  key={sec.id}
-                  className="flex items-center justify-between text-[10px] py-0.5 border-b border-slate-800/40 last:border-b-0"
-                >
-                  <span className="text-slate-300 truncate max-w-[170px]" title={sec.nombre}>
-                    {sec.nombre}
-                  </span>
-                  <div className="flex items-center gap-1.5 shrink-0 font-mono">
-                    <span
-                      className={`font-bold ${
-                        sec.cuposDisponibles > 0 ? 'text-emerald-400' : 'text-red-400'
-                      }`}
-                    >
-                      {sec.cuposDisponibles} disp.
-                    </span>
-                    <span className="text-slate-500">/ {sec.cuposOfertados}</span>
-                  </div>
-                </div>
-              ))}
+            {/* Tabs: Despachos vs Postulados */}
+            <div className="mt-2.5 flex items-center gap-1 rounded-lg bg-slate-800 p-0.5 border border-slate-700/80">
+              <button
+                type="button"
+                onClick={() => setHudTab('seccionales')}
+                className={`flex-1 py-1 px-1.5 rounded text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                  hudTab === 'seccionales'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <span>Despachos ({activeDeptStats.seccionales.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setHudTab('postulados')}
+                className={`flex-1 py-1 px-1.5 rounded text-[10px] font-bold transition-all flex items-center justify-center gap-1 cursor-pointer ${
+                  hudTab === 'postulados'
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Users className="h-3 w-3" />
+                <span>Postulados ({activeDeptEscogencias.length})</span>
+              </button>
             </div>
 
-            {/* Footer with Position Switcher and Click Prompt */}
-            <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px]">
+            {/* Tab Content */}
+            {hudTab === 'seccionales' ? (
+              /* Breakdown of Seccionales */
+              <div className="mt-2 pt-1 border-t border-slate-800 space-y-1 max-h-32 overflow-y-auto pr-1">
+                <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                  Desglose por Seccional:
+                </span>
+                {activeDeptStats.seccionales.map((sec) => (
+                  <div
+                    key={sec.id}
+                    className="flex items-center justify-between text-[10px] py-0.5 border-b border-slate-800/40 last:border-b-0"
+                  >
+                    <span className="text-slate-300 truncate max-w-[170px]" title={sec.nombre}>
+                      {sec.nombre}
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0 font-mono">
+                      <span
+                        className={`font-bold ${
+                          sec.cuposDisponibles > 0 ? 'text-emerald-400' : 'text-red-400'
+                        }`}
+                      >
+                        {sec.cuposDisponibles} disp.
+                      </span>
+                      <span className="text-slate-500">/ {sec.cuposOfertados}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* Candidate Names List */
+              <div className="mt-2 pt-1 border-t border-slate-800 space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                <div className="flex items-center justify-between">
+                  <span className="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                    Elegibles Postulados:
+                  </span>
+                  {activeDeptEscogencias.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsPostuladosModalOpen(true)}
+                      className="text-[9px] text-blue-400 hover:text-blue-300 underline font-semibold cursor-pointer"
+                    >
+                      Ampliar lista
+                    </button>
+                  )}
+                </div>
+
+                {activeDeptEscogencias.length === 0 ? (
+                  <div className="py-4 text-center text-[10px] text-slate-400">
+                    Aún no hay personas postuladas en {activeDeptStats.nombre}.
+                  </div>
+                ) : (
+                  activeDeptEscogencias.map((esc, idx) => (
+                    <div
+                      key={esc.id}
+                      className="rounded bg-slate-800/90 px-2 py-1.5 border border-slate-700/60 text-[10px] space-y-0.5"
+                    >
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="font-extrabold text-white truncate">
+                          {idx + 1}. {esc.aspirante}
+                        </span>
+                      </div>
+                      <div className="text-[9px] text-emerald-400 truncate">
+                        {esc.seccionalNombre}
+                      </div>
+                      <div className="text-[8px] text-slate-400 font-mono">
+                        {esc.fecha}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* Footer with Position Switcher and Actions */}
+            <div className="mt-2.5 pt-2 border-t border-slate-800 flex items-center justify-between text-[10px] gap-1.5">
               <button
+                type="button"
                 onClick={() => handleDeptClick(activeDeptStats.id)}
-                className="flex items-center gap-1 font-semibold text-emerald-400 hover:text-emerald-300 transition-colors"
+                className="flex items-center gap-1 font-semibold text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer"
               >
-                <CheckCircle2 className="h-3 w-3" />
-                <span>
-                  {selectedDeptId === activeDeptStats.id ? 'Fijado en lista' : 'Clic para fijar'}
+                <CheckCircle2 className="h-3 w-3 shrink-0" />
+                <span className="truncate">
+                  {selectedDeptId === activeDeptStats.id ? 'Fijado' : 'Fijar'}
                 </span>
               </button>
 
+              {activeDeptEscogencias.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsPostuladosModalOpen(true)}
+                  className="flex items-center gap-1 text-[9px] font-bold text-blue-300 bg-blue-950/80 hover:bg-blue-900 border border-blue-700/60 px-1.5 py-0.5 rounded transition-colors cursor-pointer"
+                  title="Ver nombres de todos los postulados en ventana ampliada"
+                >
+                  <Users className="h-3 w-3 shrink-0 text-blue-400" />
+                  <span>Ver {activeDeptEscogencias.length} Nombres</span>
+                </button>
+              )}
+
               <button
+                type="button"
                 onClick={() =>
                   setCornerPreference((prev) =>
                     prev === 'top-left' ? 'top-right' : 'top-left'
                   )
                 }
                 title="Mover pop-up a la otra esquina"
-                className="flex items-center gap-1 text-[9px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="flex items-center gap-1 text-[9px] text-slate-400 hover:text-white px-1.5 py-0.5 rounded bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer shrink-0"
               >
                 <ArrowRightLeft className="h-2.5 w-2.5" />
                 <span>
-                  {computedCorner === 'top-left' ? 'Mover a Der.' : 'Mover a Izq.'}
+                  {computedCorner === 'top-left' ? 'Der.' : 'Izq.'}
                 </span>
               </button>
             </div>
@@ -630,6 +753,121 @@ export const ColombiaMap: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Modal Dialog for Department Postulados List */}
+      {isPostuladosModalOpen && activeDeptStats && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between pb-3 border-b border-slate-200">
+              <div>
+                <div className="flex items-center gap-2">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                    <Users className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900 leading-tight">
+                      Postulaciones en {activeDeptStats.nombre}
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Total elegibles postulados: <strong className="text-slate-800">{activeDeptEscogencias.length}</strong>
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPostuladosModalOpen(false);
+                  setModalSearchTerm('');
+                }}
+                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Search filter within this department */}
+            {activeDeptEscogencias.length > 4 && (
+              <div className="pt-3">
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Filtrar por nombre del elegible o despacho..."
+                    value={modalSearchTerm}
+                    onChange={(e) => setModalSearchTerm(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 bg-white pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+                  />
+                  {modalSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setModalSearchTerm('')}
+                      className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Candidate list */}
+            <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-2 min-h-0 divide-y divide-slate-100">
+              {filteredModalPostulados.length === 0 ? (
+                <div className="py-12 text-center text-xs text-slate-500">
+                  {activeDeptEscogencias.length === 0
+                    ? 'No se ha registrado ninguna postulación en este departamento aún.'
+                    : 'No se encontraron elegibles que coincidan con la búsqueda.'}
+                </div>
+              ) : (
+                filteredModalPostulados.map((esc, index) => (
+                  <div
+                    key={esc.id}
+                    className="pt-2 first:pt-0 flex items-start justify-between gap-3 text-xs"
+                  >
+                    <div className="flex items-start gap-2.5 min-w-0">
+                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 font-mono text-[10px] font-bold text-slate-600">
+                        {index + 1}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="font-extrabold text-slate-900 truncate text-xs">
+                          {esc.aspirante}
+                        </div>
+                        <div className="text-[11px] font-semibold text-emerald-700 truncate">
+                          {esc.seccionalNombre}
+                        </div>
+                        <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1 mt-0.5">
+                          <Calendar className="h-2.5 w-2.5" />
+                          <span>{esc.fecha} (Hora Bogotá)</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-3 border-t border-slate-200 flex items-center justify-between text-xs mt-3">
+              <span className="text-[11px] text-slate-500">
+                Mostrando {filteredModalPostulados.length} de {activeDeptEscogencias.length} postulados
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsPostuladosModalOpen(false);
+                  setModalSearchTerm('');
+                }}
+                className="rounded-lg bg-slate-900 px-4 py-1.5 text-xs font-bold text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

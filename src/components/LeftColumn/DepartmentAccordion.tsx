@@ -8,6 +8,7 @@ import {
   Minus,
   Plus,
   X,
+  Users,
 } from 'lucide-react';
 
 export const DepartmentAccordion: React.FC = () => {
@@ -26,6 +27,7 @@ export const DepartmentAccordion: React.FC = () => {
     toggleSeccionalAutomatico,
     viewMode,
     isAdminAuthenticated,
+    escogencias,
   } = useVacantes();
 
   const filteredDepartments = useMemo(() => {
@@ -304,6 +306,35 @@ export const DepartmentAccordion: React.FC = () => {
                             </span>
                           </div>
                         )}
+
+                        {/* Postulados in this Seccional */}
+                        {(() => {
+                          const secPostulados = escogencias.filter(
+                            (e) => e.departamentoId === dept.id && e.seccionalId === sec.id
+                          );
+                          if (secPostulados.length === 0) return null;
+                          return (
+                            <div className="pt-1.5 border-t border-slate-200/70 space-y-1">
+                              <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                <Users className="h-2.5 w-2.5 text-blue-600" />
+                                Postulados ({secPostulados.length}):
+                              </span>
+                              <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
+                                {secPostulados.map((p, idx) => (
+                                  <div
+                                    key={p.id}
+                                    className="text-[10px] font-bold text-slate-800 bg-white rounded px-2 py-0.5 border border-slate-200/70 flex items-center justify-between gap-1 shadow-2xs"
+                                  >
+                                    <span className="truncate">{idx + 1}. {p.aspirante}</span>
+                                    <span className="text-[8.5px] font-mono text-slate-400 shrink-0">
+                                      {p.fecha.includes(',') ? p.fecha.split(',')[1].trim() : p.fecha}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     ))}
                   </div>
