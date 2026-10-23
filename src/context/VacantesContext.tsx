@@ -50,6 +50,7 @@ interface VacantesContextType {
   toggleSeccionalAutomatico: (deptId: string, seccionalId: string) => void;
   registrarEscogencia: (aspirante: string, deptId: string, seccionalId: string) => boolean;
   liberarEscogencia: (id: string, bypassAuth?: boolean) => void;
+  actualizarEscogencia: (registroId: string, nuevoAspirante: string, nuevoDeptId: string, nuevaSeccionalId: string) => void;
   restablecerDatosFabrica: () => void;
   simularAsignacionAleatoria: () => void;
   isHearingDay: boolean;
@@ -227,7 +228,15 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           });
           const ordered = INITIAL_DEPARTMENTS.map((initial) => {
             const found = cloudDepts.find((cd) => cd.id === initial.id);
-            return found || initial;
+            if (!found) return initial;
+            if (initial.id === 'san') {
+              const sec22 = found.seccionales.find(s => s.id === 'san-22');
+              if (sec22 && sec22.cuposOfertados === 6) {
+                setDoc(doc(db, 'departments', 'san'), initial).catch(() => {});
+                return initial;
+              }
+            }
+            return found;
           });
           setDepartments(ordered);
           setCloudSyncStatus('connected');
@@ -655,6 +664,104 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [escogencias, departments, addToast, isHearingFinished, isAdminAuthenticated]
   );
 
+  // Update an existing escogencia (syncs to Firestore)
+  const actualizarEscogencia = useCallback(
+    async (registroId: string, nuevoAspirante: string, nuevoDeptId: string, nuevaSeccionalId: string) => {
+      const oldReg = escogencias.find((e) => e.id === registroId);
+      if (!oldReg) return;
+
+      const cleanAspirante = nuevoAspirante
+        .replace(/\s*[—–-]\s*Asistente de Fiscal\s*I\s*$/i, '')
+        .replace(/\s*\(Asistente de Fiscal\s*I\)\s*$/i, '')
+        .trim();
+
+      const newDept = departments.find((d) => d.id === nuevoDeptId);
+      const newSec = newDept?.seccionales.find((s) => s.id === nuevaSeccionalId);
+
+      if (!newDept || !newSec) {
+        addToast('Selección inválida para actualización', 'warning');
+        return;
+      }
+
+      if (oldReg.seccionalId !== nuevaSeccionalId && newSec.cuposDisponibles <= 0) {
+        addToast(`No hay cupos disponibles en ${newSec.nombre}`, 'warning');
+        return;
+      }
+
+      let updatedDepartments = [...departments];
+
+      if (oldReg.seccionalId !== nuevaSeccionalId) {
+        // 1. Restore cupo to old seccional
+        updatedDepartments = updatedDepartments.map((d) => {
+          if (d.id !== oldReg.departamentoId) return d;
+          return {
+            ...d,
+            seccionales: d.seccionales.map((s) => {
+              if (s.id !== oldReg.seccionalId) return s;
+              const disp = Math.min(s.cuposOfertados, s.cuposDisponibles + 1);
+              const ocu = Math.max(0, s.cuposOcupados - 1);
+              return {
+                ...s,
+                cuposDisponibles: disp,
+                cuposOcupados: ocu,
+                disponible: s.automatico ? disp > 0 : s.disponible,
+              };
+            }),
+          };
+        });
+
+        // 2. Consume cupo in new seccional
+        updatedDepartments = updatedDepartments.map((d) => {
+          if (d.id !== nuevoDeptId) return d;
+          return {
+            ...d,
+            seccionales: d.seccionales.map((s) => {
+              if (s.id !== nuevaSeccionalId) return s;
+              const disp = Math.max(0, s.cuposDisponibles - 1);
+              const ocu = s.cuposOcupados + 1;
+              return {
+                ...s,
+                cuposDisponibles: disp,
+                cuposOcupados: ocu,
+                disponible: s.automatico ? disp > 0 : s.disponible,
+              };
+            }),
+          };
+        });
+      }
+
+      const updatedRegistro: EscogenciaRegistro = {
+        ...oldReg,
+        aspirante: cleanAspirante,
+        departamentoId: newDept.id,
+        departamentoNombre: newDept.nombre,
+        seccionalId: newSec.id,
+        seccionalNombre: newSec.nombre,
+      };
+
+      setEscogencias((prev) => prev.map((e) => (e.id === registroId ? updatedRegistro : e)));
+      setDepartments(updatedDepartments);
+
+      try {
+        await setDoc(doc(db, 'escogencias', registroId), updatedRegistro);
+        if (oldReg.departamentoId === nuevoDeptId) {
+          const deptObj = updatedDepartments.find((d) => d.id === nuevoDeptId);
+          if (deptObj) await setDoc(doc(db, 'departments', nuevoDeptId), deptObj);
+        } else {
+          const oldDeptObj = updatedDepartments.find((d) => d.id === oldReg.departamentoId);
+          const newDeptObj = updatedDepartments.find((d) => d.id === nuevoDeptId);
+          if (oldDeptObj) await setDoc(doc(db, 'departments', oldReg.departamentoId), oldDeptObj);
+          if (newDeptObj) await setDoc(doc(db, 'departments', nuevoDeptId), newDeptObj);
+        }
+      } catch (err) {
+        handleFirestoreError(err, OperationType.UPDATE, `escogencias/${registroId}`);
+      }
+
+      addToast(`Postulación de ${cleanAspirante} actualizada exitosamente`, 'success');
+    },
+    [escogencias, departments, addToast]
+  );
+
   // Reset to factory defaults in Firestore
   const restablecerDatosFabrica = useCallback(async () => {
     if (isHearingDay || isHearingFinished) {
@@ -869,6 +976,7 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         toggleSeccionalAutomatico,
         registrarEscogencia,
         liberarEscogencia,
+        actualizarEscogencia,
         restablecerDatosFabrica,
         simularAsignacionAleatoria,
         isHearingDay,

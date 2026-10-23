@@ -2,12 +2,12 @@ import { DepartmentData } from '../types';
 
 export const OFFICIAL_CONVOCATORIA_INFO = {
   cargo: 'ASISTENTE DE FISCAL I',
-  codigoOpece: 'I-204-M-01 (347)',
+  codigoOpece: 'I-204-M-01 (357)',
   acuerdo: 'Acuerdo No. 001 de 2025 (Art. 46)',
   resolucion: 'Resolución No. 09008 del 11 de diciembre de 2025',
   modalidad: 'Modalidad Ingreso - Concurso de Méritos FGN 2024',
   resolucionesElegibles: 'Resoluciones 30700-00198 del 28 de mayo de 2026 y 30700-00223 del 09 de julio de 2026',
-  totalVacantes: 347
+  totalVacantes: 357
 };
 
 export const INITIAL_DEPARTMENTS: DepartmentData[] = [
@@ -229,8 +229,8 @@ export const INITIAL_DEPARTMENTS: DepartmentData[] = [
       {
         "id": "san-22",
         "nombre": "DIRECCION SECCIONAL - SANTANDER",
-        "cuposOfertados": 6,
-        "cuposDisponibles": 6,
+        "cuposOfertados": 16,
+        "cuposDisponibles": 16,
         "cuposOcupados": 0,
         "disponible": true,
         "automatico": true

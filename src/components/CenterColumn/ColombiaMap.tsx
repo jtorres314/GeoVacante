@@ -814,7 +814,7 @@ export const ColombiaMap: React.FC = () => {
             )}
 
             {/* Candidate list */}
-            <div className="flex-1 overflow-y-auto mt-3 pr-1 space-y-2 min-h-0 divide-y divide-slate-100">
+            <div className="flex-1 max-h-[50vh] overflow-y-auto mt-3 pr-1 space-y-2 min-h-0 divide-y divide-slate-100">
               {filteredModalPostulados.length === 0 ? (
                 <div className="py-12 text-center text-xs text-slate-500">
                   {activeDeptEscogencias.length === 0

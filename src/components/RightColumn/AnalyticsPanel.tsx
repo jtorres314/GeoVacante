@@ -1,11 +1,14 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useVacantes } from '../../context/VacantesContext';
-import { SortBarBy } from '../../types';
+import { SortBarBy, EscogenciaRegistro } from '../../types';
 import {
   Trash2,
   Calendar,
   Pencil,
   GripHorizontal,
+  Search,
+  X,
+  Check,
 } from 'lucide-react';
 
 export const AnalyticsPanel: React.FC = () => {
@@ -17,18 +20,28 @@ export const AnalyticsPanel: React.FC = () => {
     setSortBarBy,
     escogencias,
     liberarEscogencia,
+    actualizarEscogencia,
     expandOnlyDept,
     liveTypingUsers,
-    isAdminAuthenticated,
     isHearingFinished,
   } = useVacantes();
 
   // Resizable split percentage: defaults strictly to 50% / 50%
   const [topPercent, setTopPercent] = useState<number>(50);
   const [isDragging, setIsDragging] = useState<boolean>(false);
-  const [deletingItem, setDeletingItem] = useState<{ id: string; aspirante: string; depto: string } | null>(null);
+  const [liveSearchTerm, setLiveSearchTerm] = useState<string>('');
+
+  // Auth modal state for delete or edit authorization code ("GeoVac2026")
+  const [authModalAction, setAuthModalAction] = useState<{ type: 'delete' | 'edit'; item: EscogenciaRegistro } | null>(null);
   const [authCode, setAuthCode] = useState('');
   const [codeError, setCodeError] = useState('');
+
+  // Edit form modal state after auth success
+  const [editingRecord, setEditingRecord] = useState<EscogenciaRegistro | null>(null);
+  const [editAspirante, setEditAspirante] = useState('');
+  const [editDeptId, setEditDeptId] = useState('');
+  const [editSeccionalId, setEditSeccionalId] = useState('');
+
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -87,6 +100,18 @@ export const AnalyticsPanel: React.FC = () => {
     }
   }, [departments, sortBarBy]);
 
+  const filteredEscogencias = useMemo(() => {
+    if (!liveSearchTerm.trim()) return escogencias;
+    const term = liveSearchTerm.toLowerCase();
+    return escogencias.filter(
+      (e) =>
+        e.aspirante.toLowerCase().includes(term) ||
+        e.departamentoNombre.toLowerCase().includes(term) ||
+        e.seccionalNombre.toLowerCase().includes(term) ||
+        e.id.toLowerCase().includes(term)
+    );
+  }, [escogencias, liveSearchTerm]);
+
   const handleSelectDept = (deptId: string) => {
     setSelectedDeptId(deptId);
     expandOnlyDept(deptId);
@@ -95,6 +120,8 @@ export const AnalyticsPanel: React.FC = () => {
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }, 50);
   };
+
+  const currentEditDept = departments.find((d) => d.id === editDeptId);
 
   return (
     <div
@@ -193,7 +220,7 @@ export const AnalyticsPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. INTERACTIVE RESIZER / DIVIDER (Drag handle to graduar el tamaño) */}
+      {/* 2. INTERACTIVE RESIZER / DIVIDER */}
       <div
         onMouseDown={handleMouseDown}
         className="group relative flex h-3.5 w-full cursor-row-resize items-center justify-between bg-slate-100 hover:bg-slate-200 border-y border-slate-300/80 px-2 transition-colors shrink-0"
@@ -222,7 +249,7 @@ export const AnalyticsPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* 3. BOTTOM PANEL: Postulaciones en Vivo (50% default height, adjustable) */}
+      {/* 3. BOTTOM PANEL: Postulaciones en Vivo */}
       <div
         style={{ height: `${100 - topPercent}%` }}
         className="bg-slate-50 p-2.5 space-y-2 flex flex-col min-h-0 overflow-hidden"
@@ -245,6 +272,26 @@ export const AnalyticsPanel: React.FC = () => {
               {escogencias.length}
             </span>
           </div>
+        </div>
+
+        {/* Search Bar for Live Postulations */}
+        <div className="relative shrink-0">
+          <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar aspirante, seccional o departamento..."
+            value={liveSearchTerm}
+            onChange={(e) => setLiveSearchTerm(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 bg-white pl-8 pr-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+          />
+          {liveSearchTerm && (
+            <button
+              onClick={() => setLiveSearchTerm('')}
+              className="absolute right-2 top-2 text-slate-400 hover:text-slate-600"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Live typing alert if someone in another tab or device is currently typing */}
@@ -271,15 +318,17 @@ export const AnalyticsPanel: React.FC = () => {
 
         {/* Chronological live postulations list */}
         <div className="overflow-y-auto space-y-1.5 pr-1 flex-1 min-h-0">
-          {escogencias.length === 0 ? (
+          {filteredEscogencias.length === 0 ? (
             <div className="py-6 text-center text-xs text-slate-500 space-y-1">
-              <p className="font-medium">Esperando primera postulación en la audiencia...</p>
+              <p className="font-medium">
+                {escogencias.length === 0 ? 'Esperando primera postulación en la audiencia...' : 'No se encontraron postulaciones con ese criterio.'}
+              </p>
               <p className="text-[10px] text-slate-400">
-                Apenas alguien registre su escogencia en cualquier equipo, aparecerá aquí en tiempo real.
+                {escogencias.length === 0 ? 'Apenas alguien registre su escogencia, aparecerá aquí en tiempo real.' : 'Intente con otro término de búsqueda.'}
               </p>
             </div>
           ) : (
-            escogencias.map((esc, index) => (
+            filteredEscogencias.map((esc) => (
               <div
                 key={esc.id}
                 className={`rounded-lg p-2 border text-xs flex items-start justify-between gap-2 shadow-2xs transition-all ${
@@ -291,7 +340,7 @@ export const AnalyticsPanel: React.FC = () => {
                 <div className="min-w-0 space-y-0.5">
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono text-[10px] font-bold text-slate-400">
-                      #{escogencias.length - index}
+                      #{escogencias.findIndex((e) => e.id === esc.id) + 1}
                     </span>
                     <span className="font-bold text-slate-900 truncate">
                       {esc.aspirante}
@@ -311,38 +360,58 @@ export const AnalyticsPanel: React.FC = () => {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDeletingItem({
-                      id: esc.id,
-                      aspirante: esc.aspirante,
-                      depto: esc.departamentoNombre,
-                    });
-                    setAuthCode('');
-                    setCodeError('');
-                  }}
-                  title="Eliminar postulación"
-                  className="rounded p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0 cursor-pointer"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthModalAction({ type: 'edit', item: esc });
+                      setAuthCode('');
+                      setCodeError('');
+                    }}
+                    title="Editar postulación"
+                    className="rounded p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-colors cursor-pointer"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthModalAction({ type: 'delete', item: esc });
+                      setAuthCode('');
+                      setCodeError('');
+                    }}
+                    title="Eliminar postulación"
+                    className="rounded p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
       </div>
 
-      {/* Verification Code Modal for Deletion */}
-      {deletingItem && (
+      {/* Verification Code Modal for Delete or Edit Authorization */}
+      {authModalAction && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-2xs">
           <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-              <Trash2 className="h-4 w-4 text-red-600" />
-              Eliminar Postulación
+              {authModalAction.type === 'delete' ? (
+                <>
+                  <Trash2 className="h-4 w-4 text-red-600" />
+                  Eliminar Postulación
+                </>
+              ) : (
+                <>
+                  <Pencil className="h-4 w-4 text-blue-600" />
+                  Autorizar Edición de Postulación
+                </>
+              )}
             </h3>
             <p className="mt-2 text-xs text-slate-600 leading-relaxed">
-              Para eliminar la escogencia de <strong>{deletingItem.aspirante}</strong> en <strong>{deletingItem.depto}</strong>, ingrese el código de autorización:
+              Para {authModalAction.type === 'delete' ? 'eliminar' : 'editar'} la escogencia de <strong>{authModalAction.item.aspirante}</strong> en <strong>{authModalAction.item.departamentoNombre}</strong>, ingrese el código de autorización:
             </p>
             <div className="mt-3">
               <input
@@ -362,7 +431,7 @@ export const AnalyticsPanel: React.FC = () => {
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setDeletingItem(null)}
+                onClick={() => setAuthModalAction(null)}
                 className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
               >
                 Cancelar
@@ -371,15 +440,118 @@ export const AnalyticsPanel: React.FC = () => {
                 type="button"
                 onClick={() => {
                   if (authCode.trim() === 'GeoVac2026') {
-                    liberarEscogencia(deletingItem.id, true);
-                    setDeletingItem(null);
+                    const item = authModalAction.item;
+                    const actionType = authModalAction.type;
+                    setAuthModalAction(null);
+
+                    if (actionType === 'delete') {
+                      liberarEscogencia(item.id, true);
+                    } else {
+                      setEditingRecord(item);
+                      setEditAspirante(item.aspirante);
+                      setEditDeptId(item.departamentoId);
+                      setEditSeccionalId(item.seccionalId);
+                    }
                   } else {
                     setCodeError('Código de autorización incorrecto.');
                   }
                 }}
-                className="rounded-lg bg-red-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-red-500"
+                className={`rounded-lg px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs ${
+                  authModalAction.type === 'delete' ? 'bg-red-600 hover:bg-red-500' : 'bg-blue-600 hover:bg-blue-500'
+                }`}
               >
-                Confirmar Eliminación
+                {authModalAction.type === 'delete' ? 'Confirmar Eliminación' : 'Autorizar y Editar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Postulation Modal */}
+      {editingRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-2xs">
+          <div className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-5 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                <Pencil className="h-4 w-4 text-blue-600" />
+                Editar Postulación
+              </h3>
+              <button
+                onClick={() => setEditingRecord(null)}
+                className="rounded p-1 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Nombre del Aspirante</label>
+                <input
+                  type="text"
+                  value={editAspirante}
+                  onChange={(e) => setEditAspirante(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 font-bold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Departamento Destino</label>
+                <select
+                  value={editDeptId}
+                  onChange={(e) => {
+                    const newId = e.target.value;
+                    setEditDeptId(newId);
+                    const d = departments.find((x) => x.id === newId);
+                    if (d && d.seccionales.length > 0) {
+                      setEditSeccionalId(d.seccionales[0].id);
+                    }
+                  }}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                >
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.nombre}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Seccional / Despacho</label>
+                <select
+                  value={editSeccionalId}
+                  onChange={(e) => setEditSeccionalId(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                >
+                  {currentEditDept?.seccionales.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.nombre} ({s.cuposDisponibles} disp. de {s.cuposOfertados})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingRecord(null)}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!editAspirante.trim()) return;
+                  actualizarEscogencia(editingRecord.id, editAspirante.trim(), editDeptId, editSeccionalId);
+                  setEditingRecord(null);
+                }}
+                className="rounded-lg bg-blue-600 px-4 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-blue-500 flex items-center gap-1.5"
+              >
+                <Check className="h-3.5 w-3.5" />
+                Guardar Cambios
               </button>
             </div>
           </div>
