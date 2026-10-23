@@ -1,0 +1,6 @@
+{
+  "name": "Concurso Fiscalía - Asignación y Mapa de Vacantes",
+  "description": "Sistema de Simulación y Asignación de Vacantes Territoriales para el Concurso de la Fiscalía General de la Nación con mapa coroplético de Colombia interactivo en tiempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

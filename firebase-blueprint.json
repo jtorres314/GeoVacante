@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "Department": {
+      "title": "Department",
+      "description": "Territorial department with its official Fiscalía vacancies and seccionales",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Department code (e.g. san, tol, dc)"
+        },
+        "nombre": {
+          "type": "string",
+          "description": "Department official name"
+        },
+        "esEspecial": {
+          "type": "boolean",
+          "description": "Flag for special border or remote departments"
+        },
+        "seccionales": {
+          "type": "array",
+          "description": "List of seccionales and specialized directions under this department"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp of last modification"
+        }
+      },
+      "required": ["id", "nombre", "seccionales"]
+    },
+    "Escogencia": {
+      "title": "Escogencia",
+      "description": "Official vacancy choice registered for a candidate in the audiencia pública",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique record identifier"
+        },
+        "aspirante": {
+          "type": "string",
+          "description": "Name and title of the elegible candidate"
+        },
+        "departamentoId": {
+          "type": "string",
+          "description": "Target department ID"
+        },
+        "departamentoNombre": {
+          "type": "string",
+          "description": "Target department name"
+        },
+        "seccionalId": {
+          "type": "string",
+          "description": "Target seccional / despacho ID"
+        },
+        "seccionalNombre": {
+          "type": "string",
+          "description": "Target seccional / despacho name"
+        },
+        "observaciones": {
+          "type": "string",
+          "description": "Additional notes or geographic priority"
+        },
+        "fecha": {
+          "type": "string",
+          "description": "Human readable date string"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp of creation"
+        }
+      },
+      "required": ["id", "aspirante", "departamentoId", "seccionalId", "fecha"]
+    }
+  },
+  "firestore": {
+    "/departments/{deptId}": {
+      "schema": "Department",
+      "description": "Collection of the 33 departments with live vacancy counts"
+    },
+    "/escogencias/{escogenciaId}": {
+      "schema": "Escogencia",
+      "description": "Chronological register of candidate choices in the public audience"
+    },
+    "/audience_live/{docId}": {
+      "schema": "Escogencia",
+      "description": "Live presence and real-time typing status of active candidates"
+    }
+  }
+}

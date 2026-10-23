@@ -1,0 +1,31 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128;
+    }
+
+    // Departments and territorial vacancies: Public read & sync
+    match /departments/{deptId} {
+      allow read: if true;
+      allow write: if isValidId(deptId);
+    }
+
+    // Official escogencias registered in real time during the public audience
+    match /escogencias/{escogenciaId} {
+      allow read: if true;
+      allow write: if isValidId(escogenciaId);
+    }
+
+    // Live typing / presence broadcast of elegibles currently selecting
+    match /audience_live/{docId} {
+      allow read: if true;
+      allow write: if isValidId(docId);
+    }
+
+    // Default deny all other paths
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
