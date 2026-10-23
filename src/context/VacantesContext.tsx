@@ -22,12 +22,6 @@ import {
 const STORAGE_KEY_DEPTS = 'concurso_fiscalia_depts_fgn_official_v3';
 const STORAGE_KEY_ESCOGENCIAS = 'concurso_fiscalia_escogencias_fgn_official_v3';
 
-interface HistorySnapshot {
-  departments: DepartmentData[];
-  escogencias: EscogenciaRegistro[];
-  description: string;
-}
-
 export type CloudSyncStatus = 'connected' | 'syncing' | 'offline';
 
 // Stable client identifier for this tab/browser session
@@ -55,7 +49,7 @@ interface VacantesContextType {
   toggleSeccionalDisponibilidad: (deptId: string, seccionalId: string) => void;
   toggleSeccionalAutomatico: (deptId: string, seccionalId: string) => void;
   registrarEscogencia: (aspirante: string, deptId: string, seccionalId: string) => boolean;
-  liberarEscogencia: (id: string) => void;
+  liberarEscogencia: (id: string, bypassAuth?: boolean) => void;
   restablecerDatosFabrica: () => void;
   simularAsignacionAleatoria: () => void;
   isHearingDay: boolean;
@@ -67,9 +61,6 @@ interface VacantesContextType {
   limpiarBaseDatosParaAudienciaReal: () => Promise<void>;
   toasts: ToastMessage[];
   dismissToast: (id: string) => void;
-  undoLastAction: () => void;
-  canUndo: boolean;
-  lastUndoText: string | null;
   cloudSyncStatus: CloudSyncStatus;
   lastCloudSyncTime: string | null;
   soundEnabled: boolean;
@@ -174,7 +165,6 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const [expandedDeptIds, setExpandedDeptIds] = useState<Record<string, boolean>>({});
 
-  const [undoStack, setUndoStack] = useState<HistorySnapshot[]>([]);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
 
   useEffect(() => {
@@ -193,28 +183,17 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [escogencias]);
 
-  const addToast = useCallback((texto: string, canUndo = true, tipo: 'info' | 'success' | 'warning' = 'info') => {
+  const addToast = useCallback((texto: string, tipo: 'info' | 'success' | 'warning' = 'info') => {
     const id = 'toast-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
     setToasts((prev) => [
       ...prev.slice(-3),
-      { id, texto, tipo, canUndo, timestamp: Date.now() },
+      { id, texto, tipo, timestamp: Date.now() },
     ]);
   }, []);
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
-
-  const pushUndoSnapshot = useCallback((description: string) => {
-    setUndoStack((prev) => [
-      ...prev.slice(-20),
-      {
-        departments: JSON.parse(JSON.stringify(departments)),
-        escogencias: JSON.parse(JSON.stringify(escogencias)),
-        description,
-      },
-    ]);
-  }, [departments, escogencias]);
 
   // Real-time Firestore Listeners with Live Postulation Alerting
   useEffect(() => {
@@ -295,7 +274,6 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
           addToast(
             `📢 ¡Nueva postulación en vivo! ${latest.aspirante} eligió ${latest.departamentoNombre} — ${latest.seccionalNombre}`,
-            false,
             'success'
           );
 
@@ -404,7 +382,7 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const updateSeccionalCupo = useCallback(
     async (deptId: string, seccionalId: string, newDisponibles: number) => {
       if (isHearingFinished) {
-        addToast('La audiencia ha finalizado a las 17:00. No se permiten modificaciones.', false, 'warning');
+        addToast('La audiencia ha finalizado a las 17:00. No se permiten modificaciones.', 'warning');
         return;
       }
 
@@ -414,8 +392,6 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const clampedDisp = Math.max(0, Math.min(targetSec.cuposOfertados, newDisponibles));
       if (clampedDisp === targetSec.cuposDisponibles) return;
-
-      pushUndoSnapshot(`Cupo de ${targetSec.nombre} ajustado a ${clampedDisp}`);
 
       const updatedDept: DepartmentData = {
         ...targetDept,
@@ -445,21 +421,21 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const isNowZero = prevDeptDisp - targetSec.cuposDisponibles + clampedDisp === 0;
 
       if (prevDeptDisp > 0 && isNowZero) {
-        addToast(`${targetDept.nombre} marcado no disponible`, true, 'warning');
+        addToast(`${targetDept.nombre} marcado no disponible`, 'warning');
       } else if (prevDeptDisp === 0 && clampedDisp > 0) {
-        addToast(`${targetDept.nombre} marcado disponible`, true, 'success');
+        addToast(`${targetDept.nombre} marcado disponible`, 'success');
       } else {
-        addToast(`Cupos de "${targetSec.nombre}" modificados a ${clampedDisp}`, true, 'info');
+        addToast(`Cupos de "${targetSec.nombre}" modificados a ${clampedDisp}`, 'info');
       }
     },
-    [departments, pushUndoSnapshot, addToast]
+    [departments, addToast, isHearingFinished]
   );
 
   // Toggle explicit availability of a seccional (syncs to Firestore)
   const toggleSeccionalDisponibilidad = useCallback(
     async (deptId: string, seccionalId: string) => {
       if (isHearingFinished) {
-        addToast('La audiencia ha finalizado a las 17:00. No se permiten modificaciones.', false, 'warning');
+        addToast('La audiencia ha finalizado a las 17:00. No se permiten modificaciones.', 'warning');
         return;
       }
 
@@ -468,7 +444,6 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (!targetDept || !targetSec) return;
 
       const newStatus = !targetSec.disponible;
-      pushUndoSnapshot(`${targetSec.nombre} marcada como ${newStatus ? 'DISPONIBLE' : 'NO DISPONIBLE'}`);
 
       const updatedDept: DepartmentData = {
         ...targetDept,
@@ -503,11 +478,10 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       addToast(
         `${targetDept.nombre} marcado ${newStatus ? 'disponible' : 'no disponible'}`,
-        true,
         newStatus ? 'success' : 'warning'
       );
     },
-    [departments, pushUndoSnapshot, addToast, isHearingFinished]
+    [departments, addToast, isHearingFinished]
   );
 
   // Toggle automatic mode for seccional (syncs to Firestore)
@@ -548,7 +522,6 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (isHearingFinished) {
         addToast(
           'La audiencia oficial ha finalizado a las 17:00 del 23 de octubre. Sistema en modo solo lectura para comprobación.',
-          false,
           'warning'
         );
         return false;
@@ -558,12 +531,12 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const sec = dept?.seccionales.find((s) => s.id === seccionalId);
 
       if (!dept || !sec) {
-        addToast('Selección inválida de departamento o seccional', false, 'warning');
+        addToast('Selección inválida de departamento o seccional', 'warning');
         return false;
       }
 
       if (sec.cuposDisponibles <= 0) {
-        addToast(`No hay cupos disponibles en ${sec.nombre}`, false, 'warning');
+        addToast(`No hay cupos disponibles en ${sec.nombre}`, 'warning');
         return false;
       }
 
@@ -573,7 +546,6 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         .trim();
 
       clearTyping();
-      pushUndoSnapshot(`Escogencia de ${cleanAspirante} en ${dept.nombre} (${sec.nombre})`);
 
       // Timestamp strictly in America/Bogota (UTC-5)
       const fechaBogota = getBogotaDateTimeString(new Date());
@@ -616,28 +588,26 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       })();
 
-      addToast(`Escogencia registrada: ${aspirante} -> ${dept.nombre}`, true, 'success');
+      addToast(`Escogencia registrada: ${aspirante} -> ${dept.nombre}`, 'success');
       return true;
     },
-    [departments, pushUndoSnapshot, addToast, clearTyping]
+    [departments, addToast, clearTyping]
   );
 
   // Liberate an escogencia (syncs to Firestore)
   const liberarEscogencia = useCallback(
-    async (registroId: string) => {
-      if (isHearingFinished) {
+    async (registroId: string, bypassAuth = false) => {
+      if (isHearingFinished && !bypassAuth) {
         addToast(
           'La audiencia oficial ha concluido a las 17:00. Las asignaciones están congeladas para comprobación.',
-          false,
           'warning'
         );
         return;
       }
 
-      if (!isAdminAuthenticated) {
+      if (!isAdminAuthenticated && !bypassAuth) {
         addToast(
           'Solo se libera para quien administra opciones (Mesa Técnica FGN). Acceso restringido.',
-          false,
           'warning'
         );
         return;
@@ -645,8 +615,6 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       const registro = escogencias.find((e) => e.id === registroId);
       if (!registro) return;
-
-      pushUndoSnapshot(`Liberación de vacante de ${registro.aspirante}`);
 
       const targetDept = departments.find((d) => d.id === registro.departamentoId);
       let updatedDept: DepartmentData | null = null;
@@ -682,44 +650,20 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         handleFirestoreError(err, OperationType.DELETE, `escogencias/${registroId}`);
       }
 
-      addToast(`Vacante de ${registro.aspirante} liberada exitosamente`, true, 'info');
+      addToast(`Postulación de ${registro.aspirante} eliminada exitosamente`, 'success');
     },
-    [escogencias, departments, pushUndoSnapshot, addToast]
+    [escogencias, departments, addToast, isHearingFinished, isAdminAuthenticated]
   );
-
-  // Undo Last Action
-  const undoLastAction = useCallback(async () => {
-    if (undoStack.length === 0) return;
-    const last = undoStack[undoStack.length - 1];
-    setUndoStack((prev) => prev.slice(0, -1));
-
-    setDepartments(last.departments);
-    setEscogencias(last.escogencias);
-
-    try {
-      const batch = writeBatch(db);
-      last.departments.forEach((d) => {
-        batch.set(doc(db, 'departments', d.id), d);
-      });
-      await batch.commit();
-    } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, 'departments');
-    }
-
-    addToast(`Deshecho: ${last.description}`, false, 'warning');
-  }, [undoStack, addToast]);
 
   // Reset to factory defaults in Firestore
   const restablecerDatosFabrica = useCallback(async () => {
     if (isHearingDay || isHearingFinished) {
       addToast(
         '⛔ Acción bloqueada: En día de Audiencia Oficial (23 de octubre), el restablecimiento está inhabilitado para proteger las escogencias de los elegibles.',
-        false,
         'warning'
       );
       return;
     }
-    pushUndoSnapshot('Restablecimiento de datos de fábrica');
     setDepartments(INITIAL_DEPARTMENTS);
     setEscogencias([]);
     setSelectedDeptId(null);
@@ -742,8 +686,8 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       handleFirestoreError(err, OperationType.WRITE, 'departments');
     }
 
-    addToast('Datos restablecidos a las 347 vacantes oficiales en Google Cloud', true, 'info');
-  }, [pushUndoSnapshot, addToast]);
+    addToast('Datos restablecidos a las 347 vacantes oficiales en Google Cloud', 'info');
+  }, [addToast, isHearingDay, isHearingFinished]);
 
   // Set simulated date (e.g. '2026-10-22' for simulations vs '2026-10-23' for official hearing)
   const setSimulatedDate = useCallback((newDate: string) => {
@@ -752,16 +696,14 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       localStorage.setItem('fgn_audiencia_date_v1', newDate);
     } catch {}
     if (newDate >= '2026-10-23') {
-      addToast('🔴 23 de Octubre de 2026: AUDIENCIA REAL OFICIAL activada. Simulaciones y restablecimientos bloqueados.', false, 'info');
+      addToast('🔴 23 de Octubre de 2026: AUDIENCIA REAL OFICIAL activada. Simulaciones y restablecimientos bloqueados.', 'info');
     } else {
-      addToast('🟢 22 de Octubre de 2026: FASE DE SIMULACIÓN PREVIA habilitada (Cargos: Asistente de Fiscal I).', false, 'info');
+      addToast('🟢 22 de Octubre de 2026: FASE DE SIMULACIÓN PREVIA habilitada (Cargos: Asistente de Fiscal I).', 'info');
     }
   }, [addToast]);
 
   // Clean database completely for October 23 Official Hearing Day
   const limpiarBaseDatosParaAudienciaReal = useCallback(async () => {
-    pushUndoSnapshot('Limpieza total para Audiencia Real del 23 de octubre');
-
     const pristineDepts = INITIAL_DEPARTMENTS.map((dept) => ({
       ...dept,
       seccionales: dept.seccionales.map((sec) => ({
@@ -796,18 +738,17 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
 
       await batch.commit();
-      addToast('🧹 Base de datos limpiada con éxito: 347 vacantes oficiales listas para la Audiencia Real del 23 de octubre de 2026', true, 'success');
+      addToast('🧹 Base de datos limpiada con éxito: 347 vacantes oficiales listas para la Audiencia Real del 23 de octubre de 2026', 'success');
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, 'escogencias');
     }
-  }, [pushUndoSnapshot, addToast]);
+  }, [addToast]);
 
   // Simulate random assignment (strictly allowed until October 22, 2026, ONLY Asistente de Fiscal I)
   const simularAsignacionAleatoria = useCallback(() => {
     if (isHearingDay) {
       addToast(
         '⛔ Simulaciones prohibidas: Hoy 23 de octubre de 2026 es el día de la AUDIENCIA PÚBLICA REAL OFICIAL. Por protocolo de mérito, las simulaciones están bloqueadas.',
-        false,
         'warning'
       );
       return;
@@ -823,7 +764,7 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
 
     if (availablePool.length === 0) {
-      addToast('No hay vacantes disponibles para simular asignación', false, 'warning');
+      addToast('No hay vacantes disponibles para simular asignación', 'warning');
       return;
     }
 
@@ -939,9 +880,6 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         limpiarBaseDatosParaAudienciaReal,
         toasts,
         dismissToast,
-        undoLastAction,
-        canUndo: undoStack.length > 0,
-        lastUndoText: undoStack.length > 0 ? undoStack[undoStack.length - 1].description : null,
         cloudSyncStatus,
         lastCloudSyncTime,
         soundEnabled,

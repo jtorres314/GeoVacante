@@ -10,7 +10,6 @@ import { RegistrarEscogencia } from './components/LeftColumn/RegistrarEscogencia
 import { DepartmentAccordion } from './components/LeftColumn/DepartmentAccordion';
 import { ColombiaMap } from './components/CenterColumn/ColombiaMap';
 import { AnalyticsPanel } from './components/RightColumn/AnalyticsPanel';
-import { ToastUndo } from './components/ToastUndo';
 import { ExportModal } from './components/ExportModal';
 import { ClipboardList, MapPin, BarChart3 } from 'lucide-react';
 
@@ -111,9 +110,6 @@ function DashboardContent() {
           </div>
         </div>
       </main>
-
-      {/* 5. Notificaciones Toast flotantes con función Undo */}
-      <ToastUndo />
 
       {/* Export modal dialog */}
       <ExportModal isOpen={isExportOpen} onClose={() => setIsExportOpen(false)} />

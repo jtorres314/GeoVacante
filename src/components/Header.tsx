@@ -5,7 +5,6 @@ import {
   Sparkles,
   Download,
   Scale,
-  Undo2,
   Cloud,
   Volume2,
   VolumeX,
@@ -27,9 +26,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
     kpis,
     restablecerDatosFabrica,
     simularAsignacionAleatoria,
-    canUndo,
-    undoLastAction,
-    lastUndoText,
     cloudSyncStatus,
     lastCloudSyncTime,
     isHearingDay,
@@ -148,18 +144,6 @@ export const Header: React.FC<HeaderProps> = ({ onOpenExport }) => {
 
         {/* Action Controls */}
         <div className="w-full 2xl:w-auto flex flex-wrap items-center justify-center 2xl:justify-end gap-2 pt-1.5 border-t border-slate-100 2xl:border-t-0 2xl:pt-0">
-
-          {/* Undo Action */}
-          {canUndo && !isHearingDay && !isHearingFinished && (
-            <button
-              onClick={undoLastAction}
-              title={lastUndoText ? `Deshacer: ${lastUndoText}` : 'Deshacer'}
-              className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-2 py-1 text-xs font-bold text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors shadow-2xs cursor-pointer"
-            >
-              <Undo2 className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Deshacer</span>
-            </button>
-          )}
 
           {/* Simulate Action (Blocked on October 23 Hearing Day) */}
           <button

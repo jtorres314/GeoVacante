@@ -44,6 +44,5 @@ export interface ToastMessage {
   id: string;
   texto: string;
   tipo?: 'info' | 'success' | 'warning';
-  canUndo?: boolean;
   timestamp: number;
 }

@@ -5,7 +5,6 @@ import {
   Trash2,
   Calendar,
   Pencil,
-  Lock,
   GripHorizontal,
 } from 'lucide-react';
 
@@ -27,6 +26,9 @@ export const AnalyticsPanel: React.FC = () => {
   // Resizable split percentage: defaults strictly to 50% / 50%
   const [topPercent, setTopPercent] = useState<number>(50);
   const [isDragging, setIsDragging] = useState<boolean>(false);
+  const [deletingItem, setDeletingItem] = useState<{ id: string; aspirante: string; depto: string } | null>(null);
+  const [authCode, setAuthCode] = useState('');
+  const [codeError, setCodeError] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -309,35 +311,80 @@ export const AnalyticsPanel: React.FC = () => {
                   </div>
                 </div>
 
-                {isHearingFinished ? (
-                  <span
-                    title="Audiencia finalizada a las 17:00: Asignación congelada para comprobación"
-                    className="p-1 text-slate-300 shrink-0"
-                  >
-                    <Lock className="h-3.5 w-3.5 text-slate-400" />
-                  </span>
-                ) : isAdminAuthenticated ? (
-                  <button
-                    type="button"
-                    onClick={() => liberarEscogencia(esc.id)}
-                    title="Liberar vacante (Mesa Técnica - Administrar opciones)"
-                    className="rounded p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0 cursor-pointer"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                ) : (
-                  <span
-                    title="Sólo se libera para quien administra opciones (Mesa Técnica)"
-                    className="p-1 text-slate-300 shrink-0"
-                  >
-                    <Lock className="h-3 w-3" />
-                  </span>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeletingItem({
+                      id: esc.id,
+                      aspirante: esc.aspirante,
+                      depto: esc.departamentoNombre,
+                    });
+                    setAuthCode('');
+                    setCodeError('');
+                  }}
+                  title="Eliminar postulación"
+                  className="rounded p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0 cursor-pointer"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </div>
             ))
           )}
         </div>
       </div>
+
+      {/* Verification Code Modal for Deletion */}
+      {deletingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-2xs">
+          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-5 shadow-2xl">
+            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+              <Trash2 className="h-4 w-4 text-red-600" />
+              Eliminar Postulación
+            </h3>
+            <p className="mt-2 text-xs text-slate-600 leading-relaxed">
+              Para eliminar la escogencia de <strong>{deletingItem.aspirante}</strong> en <strong>{deletingItem.depto}</strong>, ingrese el código de autorización:
+            </p>
+            <div className="mt-3">
+              <input
+                type="password"
+                placeholder="Código de autorización"
+                value={authCode}
+                onChange={(e) => {
+                  setAuthCode(e.target.value);
+                  if (codeError) setCodeError('');
+                }}
+                className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono"
+              />
+              {codeError && (
+                <p className="mt-1 text-[11px] font-semibold text-red-600">{codeError}</p>
+              )}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeletingItem(null)}
+                className="rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (authCode.trim() === 'GeoVac2026') {
+                    liberarEscogencia(deletingItem.id, true);
+                    setDeletingItem(null);
+                  } else {
+                    setCodeError('Código de autorización incorrecto.');
+                  }
+                }}
+                className="rounded-lg bg-red-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-xs hover:bg-red-500"
+              >
+                Confirmar Eliminación
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
