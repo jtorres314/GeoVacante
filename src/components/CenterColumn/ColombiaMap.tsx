@@ -113,6 +113,17 @@ export const ColombiaMap: React.FC = () => {
     );
   }, [activeDeptEscogencias, modalSearchTerm]);
 
+  const groupedModalPostulados = useMemo(() => {
+    const map = new Map<string, { seccionalNombre: string; items: typeof filteredModalPostulados }>();
+    filteredModalPostulados.forEach((esc) => {
+      if (!map.has(esc.seccionalId)) {
+        map.set(esc.seccionalId, { seccionalNombre: esc.seccionalNombre, items: [] });
+      }
+      map.get(esc.seccionalId)!.items.push(esc);
+    });
+    return Array.from(map.values());
+  }, [filteredModalPostulados]);
+
   // Determine corner location according to geography in Colombia (Left vs Right)
   // cx >= 295 = East/Right side -> HUD placed at Top-Left (Arriba Izquierda)
   // cx < 295  = West/Left side  -> HUD placed at Top-Right (Arriba Derecha)
@@ -813,8 +824,8 @@ export const ColombiaMap: React.FC = () => {
               </div>
             )}
 
-            {/* Candidate list */}
-            <div className="flex-1 max-h-[50vh] overflow-y-auto mt-3 pr-1 space-y-2 min-h-0 divide-y divide-slate-100">
+            {/* Candidate list grouped by seccional */}
+            <div className="flex-1 max-h-[50vh] overflow-y-auto mt-3 pr-1 space-y-3 min-h-0">
               {filteredModalPostulados.length === 0 ? (
                 <div className="py-12 text-center text-xs text-slate-500">
                   {activeDeptEscogencias.length === 0
@@ -822,27 +833,39 @@ export const ColombiaMap: React.FC = () => {
                     : 'No se encontraron elegibles que coincidan con la búsqueda.'}
                 </div>
               ) : (
-                filteredModalPostulados.map((esc, index) => (
-                  <div
-                    key={esc.id}
-                    className="pt-2 first:pt-0 flex items-start justify-between gap-3 text-xs"
-                  >
-                    <div className="flex items-start gap-2.5 min-w-0">
-                      <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 font-mono text-[10px] font-bold text-slate-600">
-                        {index + 1}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="font-extrabold text-slate-900 truncate text-xs">
-                          {esc.aspirante}
+                groupedModalPostulados.map((group) => (
+                  <div key={group.seccionalNombre} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-slate-200">
+                      <h4 className="text-[11px] font-extrabold text-slate-800 uppercase tracking-wide truncate pr-2">
+                        {group.seccionalNombre}
+                      </h4>
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-800 shrink-0">
+                        {group.items.length} {group.items.length === 1 ? 'postulado' : 'postulados'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-2">
+                      {group.items.map((esc, index) => (
+                        <div
+                          key={esc.id}
+                          className="flex items-start justify-between gap-3 text-xs bg-white p-2 rounded-lg border border-slate-200 shadow-2xs"
+                        >
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 font-mono text-[10px] font-bold text-slate-600">
+                              {index + 1}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-extrabold text-slate-900 truncate text-xs">
+                                {esc.aspirante}
+                              </div>
+                              <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1 mt-0.5">
+                                <Calendar className="h-2.5 w-2.5" />
+                                <span>{esc.fecha} (Hora Bogotá)</span>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-[11px] font-semibold text-emerald-700 truncate">
-                          {esc.seccionalNombre}
-                        </div>
-                        <div className="text-[10px] font-mono text-slate-400 flex items-center gap-1 mt-0.5">
-                          <Calendar className="h-2.5 w-2.5" />
-                          <span>{esc.fecha} (Hora Bogotá)</span>
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </div>
                 ))
