@@ -229,12 +229,11 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           const ordered = INITIAL_DEPARTMENTS.map((initial) => {
             const found = cloudDepts.find((cd) => cd.id === initial.id);
             if (!found) return initial;
-            if (initial.id === 'san') {
-              const sec22 = found.seccionales.find(s => s.id === 'san-22');
-              if (sec22 && sec22.cuposOfertados === 6) {
-                setDoc(doc(db, 'departments', 'san'), initial).catch(() => {});
-                return initial;
-              }
+            const foundTotal = found.seccionales.reduce((acc, s) => acc + s.cuposOfertados, 0);
+            const initialTotal = initial.seccionales.reduce((acc, s) => acc + s.cuposOfertados, 0);
+            if (foundTotal !== initialTotal) {
+              setDoc(doc(db, 'departments', initial.id), initial).catch(() => {});
+              return initial;
             }
             return found;
           });
@@ -292,6 +291,27 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         cloudEscogencias.sort((a, b) => b.fecha.localeCompare(a.fecha));
         setEscogencias(cloudEscogencias);
+
+        const syncedDepartments = INITIAL_DEPARTMENTS.map((dept) => {
+          return {
+            ...dept,
+            seccionales: dept.seccionales.map((sec) => {
+              const countOcupados = cloudEscogencias.filter((e) => e.seccionalId === sec.id).length;
+              const ofertados = sec.cuposOfertados;
+              const ocu = Math.min(ofertados, countOcupados);
+              const disp = Math.max(0, ofertados - ocu);
+              return {
+                ...sec,
+                cuposOfertados: ofertados,
+                cuposDisponibles: disp,
+                cuposOcupados: ocu,
+                disponible: sec.automatico ? disp > 0 : sec.disponible,
+              };
+            }),
+          };
+        });
+        setDepartments(syncedDepartments);
+
         setCloudSyncStatus('connected');
         setLastCloudSyncTime(getBogotaTimeString(new Date()));
 
@@ -901,8 +921,6 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Compute live KPIs
   const kpis = useMemo(() => {
     let totalOfertados = 0;
-    let totalOcupados = 0;
-    let totalDisponibles = 0;
     let deptosEspecialesOcupados = 0;
     let totalDeptosEspeciales = 0;
     let deptosSinCupoCount = 0;
@@ -910,18 +928,14 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     departments.forEach((d) => {
       let deptDisp = 0;
-      let deptOcu = 0;
       let deptOf = 0;
 
       d.seccionales.forEach((s) => {
         deptOf += s.cuposOfertados;
         deptDisp += s.cuposDisponibles;
-        deptOcu += s.cuposOcupados;
       });
 
       totalOfertados += deptOf;
-      totalOcupados += deptOcu;
-      totalDisponibles += deptDisp;
 
       if (d.esEspecial) {
         totalDeptosEspeciales++;
@@ -937,6 +951,8 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     });
 
+    const totalOcupados = escogencias.length;
+    const totalDisponibles = Math.max(0, totalOfertados - totalOcupados);
     const porcentajeOcupacion = totalOfertados > 0 ? (totalOcupados / totalOfertados) * 100 : 0;
 
     return {
@@ -949,7 +965,7 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       deptosSinCupoCount,
       deptosConCupoCount,
     };
-  }, [departments]);
+  }, [departments, escogencias]);
 
   return (
     <VacantesContext.Provider

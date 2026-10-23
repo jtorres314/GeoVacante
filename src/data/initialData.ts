@@ -2,12 +2,12 @@ import { DepartmentData } from '../types';
 
 export const OFFICIAL_CONVOCATORIA_INFO = {
   cargo: 'ASISTENTE DE FISCAL I',
-  codigoOpece: 'I-204-M-01 (357)',
+  codigoOpece: 'I-204-M-01 (347)',
   acuerdo: 'Acuerdo No. 001 de 2025 (Art. 46)',
   resolucion: 'Resolución No. 09008 del 11 de diciembre de 2025',
   modalidad: 'Modalidad Ingreso - Concurso de Méritos FGN 2024',
   resolucionesElegibles: 'Resoluciones 30700-00198 del 28 de mayo de 2026 y 30700-00223 del 09 de julio de 2026',
-  totalVacantes: 357
+  totalVacantes: 347
 };
 
 export const INITIAL_DEPARTMENTS: DepartmentData[] = [
@@ -177,8 +177,8 @@ export const INITIAL_DEPARTMENTS: DepartmentData[] = [
       {
         "id": "vac-17",
         "nombre": "DIRECCION SECCIONAL - VALLE DEL CAUCA",
-        "cuposOfertados": 16,
-        "cuposDisponibles": 16,
+        "cuposOfertados": 8,
+        "cuposDisponibles": 8,
         "cuposOcupados": 0,
         "disponible": true,
         "automatico": true
@@ -245,8 +245,8 @@ export const INITIAL_DEPARTMENTS: DepartmentData[] = [
       {
         "id": "tol-23",
         "nombre": "DIRECCION SECCIONAL - TOLIMA",
-        "cuposOfertados": 8,
-        "cuposDisponibles": 8,
+        "cuposOfertados": 9,
+        "cuposDisponibles": 9,
         "cuposOcupados": 0,
         "disponible": true,
         "automatico": true
@@ -429,8 +429,8 @@ export const INITIAL_DEPARTMENTS: DepartmentData[] = [
       {
         "id": "nsa-38",
         "nombre": "DIRECCION SECCIONAL - NORTE DE SANTANDER",
-        "cuposOfertados": 8,
-        "cuposDisponibles": 8,
+        "cuposOfertados": 11,
+        "cuposDisponibles": 11,
         "cuposOcupados": 0,
         "disponible": true,
         "automatico": true
@@ -513,8 +513,8 @@ export const INITIAL_DEPARTMENTS: DepartmentData[] = [
       {
         "id": "nar-45",
         "nombre": "DIRECCION SECCIONAL - NARIÑO",
-        "cuposOfertados": 9,
-        "cuposDisponibles": 9,
+        "cuposOfertados": 11,
+        "cuposDisponibles": 11,
         "cuposOcupados": 0,
         "disponible": true,
         "automatico": true
@@ -538,8 +538,8 @@ export const INITIAL_DEPARTMENTS: DepartmentData[] = [
       {
         "id": "ris-47",
         "nombre": "DIRECCION SECCIONAL - RISARALDA",
-        "cuposOfertados": 8,
-        "cuposDisponibles": 8,
+        "cuposOfertados": 1,
+        "cuposDisponibles": 1,
         "cuposOcupados": 0,
         "disponible": true,
         "automatico": true
@@ -570,8 +570,8 @@ export const INITIAL_DEPARTMENTS: DepartmentData[] = [
       {
         "id": "qui-49",
         "nombre": "DIRECCION SECCIONAL - QUINDIO",
-        "cuposOfertados": 7,
-        "cuposDisponibles": 7,
+        "cuposOfertados": 4,
+        "cuposDisponibles": 4,
         "cuposOcupados": 0,
         "disponible": true,
         "automatico": true
@@ -850,8 +850,8 @@ export const INITIAL_DEPARTMENTS: DepartmentData[] = [
       {
         "id": "vid-70",
         "nombre": "DIRECCION SECCIONAL - VICHADA",
-        "cuposOfertados": 2,
-        "cuposDisponibles": 2,
+        "cuposOfertados": 7,
+        "cuposDisponibles": 7,
         "cuposOcupados": 0,
         "disponible": true,
         "automatico": true
@@ -866,8 +866,8 @@ export const INITIAL_DEPARTMENTS: DepartmentData[] = [
       {
         "id": "vau-71",
         "nombre": "DIRECCION SECCIONAL - VAUPES",
-        "cuposOfertados": 2,
-        "cuposDisponibles": 2,
+        "cuposOfertados": 1,
+        "cuposDisponibles": 1,
         "cuposOcupados": 0,
         "disponible": true,
         "automatico": true
