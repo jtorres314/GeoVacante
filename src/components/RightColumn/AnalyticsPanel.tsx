@@ -72,7 +72,9 @@ export const AnalyticsPanel: React.FC = () => {
     };
   }, [isDragging]);
 
-  const sortedDepartments = useMemo(() => {
+  const [deptTabFilter, setDeptTabFilter] = useState<'todos' | 'disponibles' | 'sin_cupo'>('todos');
+
+  const processedDepartments = useMemo(() => {
     const list = departments.map((d) => {
       const ofertados = d.seccionales.reduce((acc, s) => acc + s.cuposOfertados, 0);
       const disponibles = d.seccionales.reduce((acc, s) => acc + s.cuposDisponibles, 0);
@@ -88,17 +90,36 @@ export const AnalyticsPanel: React.FC = () => {
         ocupados,
         pctOcupado,
         isAgotado,
+        seccionales: d.seccionales,
       };
     });
 
-    if (sortBarBy === 'mayor_ocupacion') {
-      return list.sort((a, b) => b.pctOcupado - a.pctOcupado || b.ocupados - a.ocupados);
-    } else if (sortBarBy === 'mas_disponibles') {
-      return list.sort((a, b) => b.disponibles - a.disponibles || a.pctOcupado - b.pctOcupado);
-    } else {
-      return list.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    let filtered = list;
+    if (deptTabFilter === 'disponibles') {
+      filtered = list.filter((d) => d.disponibles > 0);
+    } else if (deptTabFilter === 'sin_cupo') {
+      filtered = list.filter((d) => d.disponibles === 0);
     }
-  }, [departments, sortBarBy]);
+
+    if (sortBarBy === 'mayor_ocupacion') {
+      return filtered.sort((a, b) => b.pctOcupado - a.pctOcupado || b.ocupados - a.ocupados);
+    } else if (sortBarBy === 'mas_disponibles') {
+      return filtered.sort((a, b) => b.disponibles - a.disponibles || a.pctOcupado - b.pctOcupado);
+    } else {
+      return filtered.sort((a, b) => a.nombre.localeCompare(b.nombre));
+    }
+  }, [departments, deptTabFilter, sortBarBy]);
+
+  const deptCounts = useMemo(() => {
+    let conVacantes = 0;
+    let sinVacantes = 0;
+    departments.forEach((d) => {
+      const totalDisp = d.seccionales.reduce((acc, s) => acc + s.cuposDisponibles, 0);
+      if (totalDisp > 0) conVacantes++;
+      else sinVacantes++;
+    });
+    return { todos: departments.length, conVacantes, sinVacantes };
+  }, [departments]);
 
   const filteredEscogencias = useMemo(() => {
     if (!liveSearchTerm.trim()) return escogencias;
@@ -146,6 +167,43 @@ export const AnalyticsPanel: React.FC = () => {
             </span>
           </div>
 
+          {/* Segmented Filter Pills */}
+          <div className="grid grid-cols-3 gap-1 rounded-lg bg-slate-200/80 p-0.5 border border-slate-300/80">
+            <button
+              type="button"
+              onClick={() => setDeptTabFilter('todos')}
+              className={`py-0.5 text-center text-[10px] font-medium rounded-md transition-colors cursor-pointer ${
+                deptTabFilter === 'todos'
+                  ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Todos ({deptCounts.todos})
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeptTabFilter('disponibles')}
+              className={`py-0.5 text-center text-[10px] font-medium rounded-md transition-colors cursor-pointer ${
+                deptTabFilter === 'disponibles'
+                  ? 'bg-emerald-600 text-white shadow-2xs font-bold'
+                  : 'text-emerald-800 hover:bg-emerald-50'
+              }`}
+            >
+              Con Vacantes ({deptCounts.conVacantes})
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeptTabFilter('sin_cupo')}
+              className={`py-0.5 text-center text-[10px] font-medium rounded-md transition-colors cursor-pointer ${
+                deptTabFilter === 'sin_cupo'
+                  ? 'bg-red-600 text-white shadow-2xs font-bold'
+                  : 'text-red-800 hover:bg-red-50'
+              }`}
+            >
+              Sin Vacantes ({deptCounts.sinVacantes})
+            </button>
+          </div>
+
           {/* Dropdown sort selector */}
           <div className="flex items-center justify-between text-xs text-slate-600">
             <span className="text-[11px] font-medium">Ordenar por:</span>
@@ -163,60 +221,89 @@ export const AnalyticsPanel: React.FC = () => {
 
         {/* Horizontal Progress Bars List */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1.5 divide-y divide-slate-100 min-h-0">
-          {sortedDepartments.map((dept) => {
-            const isSelected = selectedDeptId === dept.id;
+          {processedDepartments.length === 0 ? (
+            <div className="py-6 text-center text-xs text-slate-500">
+              No hay departamentos en esta categoría.
+            </div>
+          ) : (
+            processedDepartments.map((dept) => {
+              const isSelected = selectedDeptId === dept.id;
 
-            return (
-              <div
-                key={dept.id}
-                onClick={() => handleSelectDept(dept.id)}
-                className={`pt-1.5 rounded-lg p-2 cursor-pointer transition-all border ${
-                  isSelected
-                    ? 'bg-red-50/50 border-red-400'
-                    : 'border-transparent hover:bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center justify-between text-xs mb-1">
-                  <span className="font-semibold text-slate-800 truncate pr-2">
-                    {dept.nombre}
-                  </span>
-                  <span className="font-mono text-[11px] tabular-nums shrink-0">
-                    <span className={dept.isAgotado ? 'text-red-600 font-bold' : 'text-slate-800 font-bold'}>
-                      {dept.ocupados}
+              return (
+                <div
+                  key={dept.id}
+                  onClick={() => handleSelectDept(dept.id)}
+                  className={`pt-1.5 rounded-lg p-2 cursor-pointer transition-all border ${
+                    isSelected
+                      ? 'bg-red-50/50 border-red-400 shadow-2xs'
+                      : 'border-transparent hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="font-bold text-slate-800 truncate pr-2 flex items-center gap-1.5">
+                      <span>{dept.nombre}</span>
+                      {dept.isAgotado ? (
+                        <span className="rounded bg-red-100 text-red-800 text-[9px] font-extrabold px-1.5 py-0.2 border border-red-300">
+                          AGOTADO
+                        </span>
+                      ) : (
+                        <span className="rounded bg-emerald-100 text-emerald-800 text-[9px] font-extrabold px-1.5 py-0.2 border border-emerald-300">
+                          {dept.disponibles} DISP.
+                        </span>
+                      )}
                     </span>
-                    <span className="text-slate-500">/{dept.ofertados}</span>
-                  </span>
-                </div>
+                    <span className="font-mono text-[11px] tabular-nums shrink-0">
+                      <span className={dept.isAgotado ? 'text-red-600 font-bold' : 'text-slate-800 font-bold'}>
+                        {dept.ocupados}
+                      </span>
+                      <span className="text-slate-500">/{dept.ofertados}</span>
+                    </span>
+                  </div>
 
-                {/* Progress bar */}
-                <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden flex border border-slate-200">
-                  {dept.isAgotado ? (
-                    <div className="h-full bg-red-500 w-full" />
-                  ) : (
-                    <>
-                      <div
-                        className="h-full bg-red-400 transition-all duration-300"
-                        style={{ width: `${dept.pctOcupado}%` }}
-                      />
-                      <div
-                        className="h-full bg-emerald-500 transition-all duration-300"
-                        style={{ width: `${100 - dept.pctOcupado}%` }}
-                      />
-                    </>
-                  )}
-                </div>
+                  {/* Progress bar */}
+                  <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden flex border border-slate-200">
+                    {dept.isAgotado ? (
+                      <div className="h-full bg-red-500 w-full" />
+                    ) : (
+                      <>
+                        <div
+                          className="h-full bg-red-400 transition-all duration-300"
+                          style={{ width: `${dept.pctOcupado}%` }}
+                        />
+                        <div
+                          className="h-full bg-emerald-500 transition-all duration-300"
+                          style={{ width: `${100 - dept.pctOcupado}%` }}
+                        />
+                      </>
+                    )}
+                  </div>
 
-                <div className="flex justify-between items-center text-[10px] text-slate-500 mt-1">
-                  <span className={dept.disponibles > 0 ? 'text-emerald-700 font-medium' : 'text-red-600 font-medium'}>
-                    {dept.disponibles} disponibles
-                  </span>
-                  <span>
-                    {dept.isAgotado ? 'Agotado (0 cupos)' : `${dept.pctOcupado.toFixed(0)}% ocupado`}
-                  </span>
+                  <div className="flex justify-between items-center text-[10px] text-slate-500 mt-1">
+                    <span className={dept.disponibles > 0 ? 'text-emerald-700 font-medium' : 'text-red-600 font-medium'}>
+                      {dept.disponibles} disponibles
+                    </span>
+                    <span>
+                      {dept.isAgotado ? 'Agotado (0 cupos)' : `${dept.pctOcupado.toFixed(0)}% ocupado`}
+                    </span>
+                  </div>
+
+                  {/* Seccionales detailed breakdown */}
+                  <div className="mt-1.5 space-y-1 pt-1.5 border-t border-slate-100">
+                    {dept.seccionales.map((sec) => (
+                      <div key={sec.id} className="flex items-center justify-between text-[10px]">
+                        <span className="text-slate-700 truncate font-medium pr-1">
+                          • {sec.nombre}
+                        </span>
+                        <span className={`font-mono font-bold shrink-0 ${sec.cuposDisponibles > 0 ? 'text-emerald-700' : 'text-red-600'}`}>
+                          {sec.cuposDisponibles > 0 ? `${sec.cuposDisponibles} disp.` : 'Agotado'} ({sec.cuposOcupados}/{sec.cuposOfertados})
+                        </span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
 

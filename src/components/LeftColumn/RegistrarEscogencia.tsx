@@ -1,5 +1,6 @@
 import React, { useState, useId } from 'react';
 import { useVacantes } from '../../context/VacantesContext';
+import { removeAccents } from '../../utils/textSanitizer';
 import { BookmarkCheck, Lock } from 'lucide-react';
 
 export const RegistrarEscogencia: React.FC = () => {
@@ -63,10 +64,12 @@ export const RegistrarEscogencia: React.FC = () => {
       return;
     }
 
-    const cleanName = aspirante
-      .replace(/\s*[—–-]\s*Asistente de Fiscal\s*I\s*$/i, '')
-      .replace(/\s*\(Asistente de Fiscal\s*I\)\s*$/i, '')
-      .trim();
+      const cleanName = removeAccents(
+        aspirante
+          .replace(/\s*[—–-]\s*Asistente de Fiscal\s*I\s*$/i, '')
+          .replace(/\s*\(Asistente de Fiscal\s*I\)\s*$/i, '')
+          .trim()
+      );
 
     if (!cleanName) {
       setErrorMsg('Ingresa el nombre del elegible.');

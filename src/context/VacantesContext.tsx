@@ -3,6 +3,7 @@ import { DepartmentData, EscogenciaRegistro, LiveTypingUser, ViewMode, FilterSta
 import { INITIAL_DEPARTMENTS } from '../data/initialData';
 import { db, handleFirestoreError, OperationType, testFirestoreConnection } from '../lib/firebase';
 import { playLivePostulationSound } from '../utils/audioChime';
+import { removeAccents } from '../utils/textSanitizer';
 import {
   getBogotaDateTimeString,
   getBogotaTimeString,
@@ -97,8 +98,6 @@ const isEscogenciaForSeccional = (
   dept: DepartmentData,
   sec: DepartmentData['seccionales'][0]
 ): boolean => {
-  if (e.seccionalId && e.seccionalId === sec.id) return true;
-
   const normDeptName = normalizeText(dept.nombre);
   const normEscDeptName = normalizeText(e.departamentoNombre || '');
 
@@ -110,35 +109,13 @@ const isEscogenciaForSeccional = (
 
   if (!deptMatches) return false;
 
-  const normE = normalizeText(e.seccionalNombre || '');
-  const normS = normalizeText(sec.nombre || '');
-
-  // If department has only 1 seccional
+  // Single seccional in department
   if (dept.seccionales.length === 1) {
-    const isSecNC = normS.includes('nivel central');
-    const isEscNC = normE.includes('nivel central');
-    if (isSecNC === isEscNC) return true;
+    return true;
   }
 
-  if (!normE || !normS) return false;
-  if (normE === normS) return true;
-
-  const isSecNC = normS.includes('nivel central');
-  const isEscNC = normE.includes('nivel central');
-  if (isSecNC !== isEscNC) return false;
-
-  const cleanE = normE
-    .replace(/^nivel central\s*/, '')
-    .replace(/^direccion seccional\s*/, '')
-    .replace(/^direccion especializada\s*/, '')
-    .trim();
-  const cleanS = normS
-    .replace(/^nivel central\s*/, '')
-    .replace(/^direccion seccional\s*/, '')
-    .replace(/^direccion especializada\s*/, '')
-    .trim();
-
-  if (cleanE === cleanS) return true;
+  const normE = normalizeText(e.seccionalNombre || '');
+  const normS = normalizeText(sec.nombre || '');
 
   const keywords = [
     'extincion',
@@ -154,12 +131,46 @@ const isEscogenciaForSeccional = (
     'recursos naturales',
   ];
 
-  for (const kw of keywords) {
-    if (cleanE.includes(kw) && cleanS.includes(kw)) {
+  const secHasKeyword = keywords.some((kw) => normS.includes(kw));
+  const escHasKeyword = keywords.some((kw) => normE.includes(kw));
+
+  // 1. Direct ID match if names align or no keyword conflict
+  if (e.seccionalId && e.seccionalId === sec.id) {
+    if (secHasKeyword && !escHasKeyword) {
+      // Avoid wrong specialty assignment
+    } else {
       return true;
     }
   }
 
+  // 2. Specialty Nivel Central matching
+  if (secHasKeyword) {
+    if (!escHasKeyword) return false;
+    for (const kw of keywords) {
+      if (normS.includes(kw) && normE.includes(kw)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // 3. Dirección Seccional fallback: if postulation has no specialty keyword, it belongs to DIRECCION SECCIONAL
+  if (normS.includes('direccion seccional') && !escHasKeyword) {
+    return true;
+  }
+
+  const cleanE = normE
+    .replace(/^nivel central\s*/, '')
+    .replace(/^direccion seccional\s*/, '')
+    .replace(/^direccion especializada\s*/, '')
+    .trim();
+  const cleanS = normS
+    .replace(/^nivel central\s*/, '')
+    .replace(/^direccion seccional\s*/, '')
+    .replace(/^direccion especializada\s*/, '')
+    .trim();
+
+  if (cleanE === cleanS) return true;
   if (cleanE.length > 3 && cleanS.length > 3) {
     if (cleanE.includes(cleanS) || cleanS.includes(cleanE)) return true;
   }
@@ -271,6 +282,8 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const isInitialLoadRef = useRef(true);
   const soundEnabledRef = useRef(soundEnabled);
   soundEnabledRef.current = soundEnabled;
+  const latestEscogenciasRef = useRef<EscogenciaRegistro[]>(escogencias);
+  latestEscogenciasRef.current = escogencias;
 
   const [expandedDeptIds, setExpandedDeptIds] = useState<Record<string, boolean>>({});
 
@@ -345,7 +358,7 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
             return found;
           });
-          setDepartments(ordered);
+          setDepartments(computeSyncedDepartments(ordered, latestEscogenciasRef.current));
           setCloudSyncStatus('connected');
           setLastCloudSyncTime(new Date().toLocaleTimeString());
         }
@@ -372,12 +385,20 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         snapshot.forEach((docSnap) => {
           const item = docSnap.data() as EscogenciaRegistro;
-          // Mark as new if arrived in this live change
+          const sanitizedName = removeAccents(item.aspirante || '');
           const isFresh = newlyAddedItems.some((n) => n.id === item.id);
-          cloudEscogencias.push({
+
+          const cleanItem: EscogenciaRegistro = {
             ...item,
+            aspirante: sanitizedName,
             isNew: isFresh,
-          });
+          };
+
+          if (item.aspirante && item.aspirante !== sanitizedName) {
+            setDoc(doc(db, 'escogencias', item.id), cleanItem).catch(() => {});
+          }
+
+          cloudEscogencias.push(cleanItem);
         });
 
         // Trigger real-time alert and audio chime when someone submits
@@ -658,10 +679,12 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return false;
       }
 
-      const cleanAspirante = aspirante
-        .replace(/\s*[—–-]\s*Asistente de Fiscal\s*I\s*$/i, '')
-        .replace(/\s*\(Asistente de Fiscal\s*I\)\s*$/i, '')
-        .trim();
+      const cleanAspirante = removeAccents(
+        aspirante
+          .replace(/\s*[—–-]\s*Asistente de Fiscal\s*I\s*$/i, '')
+          .replace(/\s*\(Asistente de Fiscal\s*I\)\s*$/i, '')
+          .trim()
+      );
 
       clearTyping();
 
@@ -779,10 +802,12 @@ export const VacantesProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const oldReg = escogencias.find((e) => e.id === registroId);
       if (!oldReg) return;
 
-      const cleanAspirante = nuevoAspirante
-        .replace(/\s*[—–-]\s*Asistente de Fiscal\s*I\s*$/i, '')
-        .replace(/\s*\(Asistente de Fiscal\s*I\)\s*$/i, '')
-        .trim();
+      const cleanAspirante = removeAccents(
+        nuevoAspirante
+          .replace(/\s*[—–-]\s*Asistente de Fiscal\s*I\s*$/i, '')
+          .replace(/\s*\(Asistente de Fiscal\s*I\)\s*$/i, '')
+          .trim()
+      );
 
       const newDept = departments.find((d) => d.id === nuevoDeptId);
       const newSec = newDept?.seccionales.find((s) => s.id === nuevaSeccionalId);
