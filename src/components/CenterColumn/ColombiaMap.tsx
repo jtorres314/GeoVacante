@@ -634,7 +634,7 @@ export const ColombiaMap: React.FC = () => {
                     >
                       <div className="flex items-center justify-between gap-1">
                         <span className="font-extrabold text-white truncate">
-                          {idx + 1}. {esc.aspirante}
+                          {escogencias.length - escogencias.findIndex((e) => e.id === esc.id)}. {esc.aspirante}
                         </span>
                       </div>
                       <div className="text-[9px] text-emerald-400 truncate">
@@ -852,7 +852,7 @@ export const ColombiaMap: React.FC = () => {
                         >
                           <div className="flex items-start gap-2.5 min-w-0">
                             <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 font-mono text-[10px] font-bold text-slate-600">
-                              {index + 1}
+                              {escogencias.length - escogencias.findIndex((e) => e.id === esc.id)}
                             </div>
                             <div className="min-w-0">
                               <div className="font-extrabold text-slate-900 truncate text-xs">

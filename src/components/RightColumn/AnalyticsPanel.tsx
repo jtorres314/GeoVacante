@@ -340,7 +340,7 @@ export const AnalyticsPanel: React.FC = () => {
                 <div className="min-w-0 space-y-0.5">
                   <div className="flex items-center gap-1.5">
                     <span className="font-mono text-[10px] font-bold text-slate-400">
-                      #{escogencias.findIndex((e) => e.id === esc.id) + 1}
+                      #{escogencias.length - escogencias.findIndex((e) => e.id === esc.id)}
                     </span>
                     <span className="font-bold text-slate-900 truncate">
                       {esc.aspirante}
