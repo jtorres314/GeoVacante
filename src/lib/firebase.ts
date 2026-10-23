@@ -1,12 +1,25 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
+import fallbackConfig from '../../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
+// Use environment variables if provided (e.g. in Vercel), otherwise fall back to firebase-applet-config.json
+const resolvedConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || import.meta.env.FIREBASE_API_KEY || fallbackConfig.apiKey,
+  authDomain: fallbackConfig.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || import.meta.env.FIREBASE_PROJECT_ID || fallbackConfig.projectId,
+  storageBucket: fallbackConfig.storageBucket,
+  messagingSenderId: fallbackConfig.messagingSenderId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || import.meta.env.FIREBASE_APP_ID || fallbackConfig.appId,
+  measurementId: fallbackConfig.measurementId,
+};
+
+const resolvedDatabaseId = import.meta.env.VITE_FIRESTORE_DATABASE_ID || import.meta.env.FIRESTORE_DATABASE_ID || fallbackConfig.firestoreDatabaseId;
+
+const app = initializeApp(resolvedConfig);
 
 // CRITICAL: The app will break without specifying firestoreDatabaseId
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = getFirestore(app, resolvedDatabaseId);
 export const auth = getAuth(app);
 
 export enum OperationType {
